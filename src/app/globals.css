@@ -1,0 +1,476 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light mode colors */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+  }
+
+  .dark {
+    /* Dark mode colors */
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Dark mode specific styles */
+  .dark {
+    color-scheme: dark;
+  }
+
+  .dark .ProseMirror {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .hl-grammar {
+    background: rgba(239, 68, 68, 0.2) !important;
+    border-bottom-color: #ef4444 !important;
+  }
+
+  .dark .hl-spelling {
+    background: rgba(59, 130, 246, 0.2) !important;
+    border-bottom-color: #3b82f6 !important;
+  }
+
+  .dark .hl-style {
+    background: rgba(245, 158, 11, 0.2) !important;
+    border-bottom-color: #f59e0b !important;
+  }
+
+  .dark .hl-fluency {
+    background: rgba(59, 130, 246, 0.2) !important;
+    border-bottom-color: #3b82f6 !important;
+  }
+
+  .dark .hl-tone {
+    background: rgba(16, 185, 129, 0.2) !important;
+    border-bottom-color: #10b981 !important;
+  }
+
+  /* High contrast mode detection */
+  @media (prefers-contrast: high) {
+    .suggestion-highlight,
+    .hl-grammar,
+    .hl-style,
+    .hl-spelling {
+      outline: 2px solid currentColor !important;
+      background: transparent !important;
+    }
+  }
+  
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .prose {
+    @apply max-w-none;
+  }
+
+  .prose p {
+    @apply my-4;
+  }
+
+  .prose h1 {
+    @apply text-3xl font-bold mt-8 mb-4;
+  }
+
+  .prose h2 {
+    @apply text-2xl font-bold mt-6 mb-3;
+  }
+
+  .prose h3 {
+    @apply text-xl font-bold mt-4 mb-2;
+  }
+
+  .prose ul {
+    @apply list-disc list-inside my-4;
+  }
+
+  .prose ol {
+    @apply list-decimal list-inside my-4;
+  }
+
+  .prose blockquote {
+    @apply border-l-4 border-gray-300 pl-4 italic my-4;
+  }
+
+  .prose code {
+    @apply bg-gray-100 px-1 py-0.5 rounded text-sm;
+  }
+
+  .prose pre {
+    @apply bg-gray-100 p-4 rounded my-4 overflow-x-auto;
+  }
+
+  .prose a {
+    @apply text-blue-600 hover:text-blue-800 underline;
+  }
+
+  /* TipTap Editor Styles */
+  .ProseMirror {
+    @apply outline-none;
+  }
+
+  .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    @apply text-gray-400 pointer-events-none float-left h-0;
+  }
+
+  /* Grammar highlighting styles - Enhanced and more visible */
+  .ProseMirror .grammar-highlight,
+  .ProseMirror [data-grammar-highlight] {
+    position: relative !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    border-radius: 2px !important;
+    padding: 0 2px !important;
+  }
+
+  /* Grammar highlights */
+  .ProseMirror .grammar-highlight[data-type="grammar"],
+  .ProseMirror .grammar-highlight-grammar,
+  .ProseMirror [data-type="grammar"][data-grammar-highlight] {
+    background-color: rgba(254, 242, 242, 0.8) !important;
+    border-bottom: 2px solid #ef4444 !important;
+    color: #b91c1c !important;
+    background-image: linear-gradient(45deg, transparent 65%, rgba(239, 68, 68, 0.3) 80%, transparent 90%) !important;
+    background-size: 6px 6px !important;
+    background-repeat: repeat-x !important;
+    background-position: 0 bottom !important;
+  }
+
+  /* Spelling highlights */
+  .ProseMirror .grammar-highlight[data-type="spelling"],
+  .ProseMirror .grammar-highlight-spelling,
+  .ProseMirror [data-type="spelling"][data-grammar-highlight] {
+    background-color: rgba(239, 246, 255, 0.8) !important;
+    border-bottom: 2px solid #3b82f6 !important;
+    color: #1d4ed8 !important;
+    background-image: linear-gradient(45deg, transparent 65%, rgba(59, 130, 246, 0.3) 80%, transparent 90%) !important;
+    background-size: 6px 6px !important;
+    background-repeat: repeat-x !important;
+    background-position: 0 bottom !important;
+  }
+
+  /* Style highlights */
+  .ProseMirror .grammar-highlight[data-type="style"],
+  .ProseMirror .grammar-highlight-style,
+  .ProseMirror [data-type="style"][data-grammar-highlight] {
+    background-color: rgba(255, 251, 235, 0.8) !important;
+    border-bottom: 2px solid #f59e0b !important;
+    color: #92400e !important;
+    background-image: linear-gradient(45deg, transparent 65%, rgba(245, 158, 11, 0.3) 80%, transparent 90%) !important;
+    background-size: 6px 6px !important;
+    background-repeat: repeat-x !important;
+    background-position: 0 bottom !important;
+  }
+
+  /* Hover effects */
+  .ProseMirror .grammar-highlight:hover,
+  .ProseMirror [data-grammar-highlight]:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    transform: scale(1.02) !important;
+    filter: brightness(0.95) !important;
+  }
+
+  /* Enhanced inline highlighting decorations with underlines */
+  .hl-grammar {
+    background: rgba(255, 235, 230, 0.65) !important;
+    border-radius: 3px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    padding: 1px 2px !important;
+    border-bottom: 2px solid #ef4444 !important;
+    text-decoration: underline !important;
+    text-decoration-color: #ef4444 !important;
+    text-decoration-style: wavy !important;
+    text-underline-offset: 2px !important;
+    position: relative !important;
+  }
+
+  .hl-fluency {
+    background: rgba(235, 245, 255, 0.65) !important;
+    border-radius: 3px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    padding: 1px 2px !important;
+    border-bottom: 2px solid #3b82f6 !important;
+    text-decoration: underline !important;
+    text-decoration-color: #3b82f6 !important;
+    text-decoration-style: wavy !important;
+    text-underline-offset: 2px !important;
+    position: relative !important;
+  }
+
+  .hl-tone {
+    background: rgba(235, 255, 235, 0.65) !important;
+    border-radius: 3px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    padding: 1px 2px !important;
+    border-bottom: 2px solid #10b981 !important;
+    text-decoration: underline !important;
+    text-decoration-color: #10b981 !important;
+    text-decoration-style: wavy !important;
+    text-underline-offset: 2px !important;
+    position: relative !important;
+  }
+
+  /* Support for existing suggestion types with enhanced styling */
+  .hl-spelling {
+    background: rgba(235, 245, 255, 0.65) !important;
+    border-radius: 3px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    padding: 1px 2px !important;
+    border-bottom: 2px solid #3b82f6 !important;
+    text-decoration: underline !important;
+    text-decoration-color: #3b82f6 !important;
+    text-decoration-style: wavy !important;
+    text-underline-offset: 2px !important;
+    position: relative !important;
+  }
+
+  .hl-style {
+    background: rgba(255, 251, 235, 0.65) !important;
+    border-radius: 3px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    padding: 1px 2px !important;
+    border-bottom: 2px solid #f59e0b !important;
+    text-decoration: underline !important;
+    text-decoration-color: #f59e0b !important;
+    text-decoration-style: wavy !important;
+    text-underline-offset: 2px !important;
+    position: relative !important;
+  }
+
+  /* Enhanced hover effects for inline highlights */
+  .hl-grammar:hover {
+    background: rgba(255, 235, 230, 0.85) !important;
+    transform: scale(1.02) !important;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
+    border-bottom-width: 3px !important;
+    text-decoration-thickness: 2px !important;
+  }
+
+  .hl-fluency:hover {
+    background: rgba(235, 245, 255, 0.85) !important;
+    transform: scale(1.02) !important;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+    border-bottom-width: 3px !important;
+    text-decoration-thickness: 2px !important;
+  }
+
+  .hl-tone:hover {
+    background: rgba(235, 255, 235, 0.85) !important;
+    transform: scale(1.02) !important;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3) !important;
+    border-bottom-width: 3px !important;
+    text-decoration-thickness: 2px !important;
+  }
+
+  .hl-spelling:hover {
+    background: rgba(235, 245, 255, 0.85) !important;
+    transform: scale(1.02) !important;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+    border-bottom-width: 3px !important;
+    text-decoration-thickness: 2px !important;
+  }
+
+  .hl-style:hover {
+    background: rgba(255, 251, 235, 0.85) !important;
+    transform: scale(1.02) !important;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3) !important;
+    border-bottom-width: 3px !important;
+    text-decoration-thickness: 2px !important;
+  }
+
+  /* Exact inline suggestion decoration classes as requested */
+  .hl-grammar { background: rgba(255,235,230,.55); }
+  .hl-fluency { background: rgba(235,245,255,.55); }
+  .hl-tone    { background: rgba(235,255,235,.55); }
+
+
+
+  /* Modern Tooltip styles */
+  .grammar-tooltip {
+    @apply absolute z-50 bg-gradient-to-r from-slate-800 to-slate-900 text-white text-sm rounded-xl px-4 py-3 shadow-2xl max-w-xs border border-slate-700;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 12px;
+    backdrop-filter: blur(10px);
+    animation: tooltipFadeIn 0.2s ease-out;
+  }
+
+  @keyframes tooltipFadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  .grammar-tooltip::after {
+    @apply absolute border-8 border-transparent;
+    content: '';
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-top-color: rgb(30 41 59);
+  }
+
+  .grammar-tooltip.hidden {
+    @apply opacity-0 pointer-events-none;
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-slate-100 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-gradient-to-b from-blue-400 to-blue-600 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply from-blue-500 to-blue-700;
+  }
+
+  /* Enhanced editor focus */
+  .ProseMirror:focus-within {
+    @apply ring-2 ring-blue-500/20 ring-offset-2;
+  }
+
+  .ProseMirror:focus {
+    @apply ring-2 ring-blue-500 ring-opacity-50 rounded;
+  }
+
+  .ProseMirror h1, .ProseMirror h2, .ProseMirror h3 {
+    @apply mt-6 mb-4 first:mt-0;
+  }
+
+  /* Enhanced list styling with better inline behavior */
+  .ProseMirror ul, .ProseMirror ol {
+    @apply pl-6 my-2;
+  }
+
+  .ProseMirror ul li {
+    @apply list-disc;
+    display: list-item;
+    line-height: 1.6;
+  }
+
+  .ProseMirror ol li {
+    @apply list-decimal;
+    display: list-item;
+    line-height: 1.6;
+  }
+
+  /* Allow inline content within list items */
+  .ProseMirror .editor-list-item {
+    display: list-item !important;
+    margin: 0.2em 0 !important;
+  }
+
+  .ProseMirror .editor-list-item p {
+    display: inline !important;
+    margin: 0 !important;
+  }
+
+  /* Prevent forced line breaks in list items */
+  .ProseMirror .editor-bullet-list,
+  .ProseMirror .editor-ordered-list {
+    margin: 0.5em 0 !important;
+  }
+
+  .ProseMirror .editor-bullet-list li,
+  .ProseMirror .editor-ordered-list li {
+    margin: 0.1em 0 !important;
+    padding: 0 !important;
+  }
+
+  .ProseMirror blockquote {
+    @apply border-l-4 border-gray-300 pl-4 ml-4 italic;
+  }
+
+  .ProseMirror hr {
+    @apply border-gray-300 my-6;
+  }
+
+  .ProseMirror strong {
+    @apply font-bold;
+  }
+
+  .ProseMirror em {
+    @apply italic;
+  }
+
+  .ProseMirror code {
+    @apply bg-gray-100 px-1 py-0.5 rounded text-sm font-mono;
+  }
+
+  .ProseMirror pre {
+    @apply bg-gray-100 p-4 rounded-lg my-4 overflow-x-auto;
+  }
+
+  .ProseMirror pre code {
+    @apply bg-transparent p-0;
+  }
+} 

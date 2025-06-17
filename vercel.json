@@ -1,0 +1,71 @@
+{
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_FIREBASE_API_KEY": "@firebase-api-key",
+      "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": "@firebase-auth-domain",
+      "NEXT_PUBLIC_FIREBASE_PROJECT_ID": "@firebase-project-id",
+      "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": "@firebase-storage-bucket",
+      "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "@firebase-messaging-sender-id",
+      "NEXT_PUBLIC_FIREBASE_APP_ID": "@firebase-app-id",
+      "FIREBASE_ADMIN_PROJECT_ID": "@firebase-admin-project-id",
+      "FIREBASE_ADMIN_CLIENT_EMAIL": "@firebase-admin-client-email",
+      "FIREBASE_ADMIN_PRIVATE_KEY": "@firebase-admin-private-key",
+      "NEXT_PUBLIC_SENTRY_DSN": "@sentry-dsn"
+    }
+  },
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 10
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ]
+} 
