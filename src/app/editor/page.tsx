@@ -5,7 +5,7 @@ import { User } from 'firebase/auth';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import Editor from '@/components/Editor';
+import EditorShell from './EditorShell';
 import { useEditorStore } from '@/store/editorStore';
 
 export const dynamic = 'force-dynamic';
@@ -91,34 +91,6 @@ export default function EditorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm" role="navigation" aria-label="Main navigation">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-blue-600">WordWise</h1>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600" role="status">
-                Signed in as {user.email}
-              </span>
-              <button
-                onClick={handleSignOut}
-                className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                aria-label="Sign out of WordWise"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main role="main" aria-label="Document editor">
-        <Editor />
-      </main>
-    </div>
+    <EditorShell user={user} onSignOut={handleSignOut} />
   );
 } 

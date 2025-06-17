@@ -304,7 +304,7 @@ const generateMockSuggestions = (text: string) => {
       message: 'Consider using more specific adjectives like "terrible", "awful", or "dreadful" instead of "very bad".'
     },
     {
-      pattern: /\ba\s+lot\s+of\s+(\w+)/gi,
+      pattern: /\ba\s+lot\s+of\s+([a-zA-Z]+)/gi,
       replacement: 'many $1',
       type: 'style',
       rule: 'INFORMAL_LANGUAGE',

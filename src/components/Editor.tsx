@@ -13,6 +13,9 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { auth, createPerformanceTrace } from '@/lib/firebase';
 import ThemeToggle from './ThemeToggle';
 import KeyboardShortcuts from './KeyboardShortcuts';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Toggle } from '@/components/ui/toggle';
 // import { db } from '@/lib/firebase'; // Temporarily disabled
 
 // Create plugin key for grammar highlights
@@ -675,39 +678,41 @@ const Editor = () => {
                 aria-describedby="document-info"
               />
               <div id="document-info" className="flex items-center space-x-2" role="status" aria-live="polite">
-                <span 
-                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-700 transition-colors duration-300"
+                <Badge 
+                  variant="secondary"
+                  className="text-sm font-medium"
                   aria-label={`Word count: ${wordCount} words`}
                 >
                   📝 {wordCount} {wordCount === 1 ? 'word' : 'words'}
-                </span>
+                </Badge>
                 {performanceMetrics.totalChecks > 0 && (
-                  <span 
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                      performanceMetrics.lastResponseTime < 2000 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}
+                  <Badge 
+                    variant={performanceMetrics.lastResponseTime < 2000 ? "default" : "destructive"}
+                    className="text-xs font-medium"
                     aria-label={`Grammar check response time: ${performanceMetrics.lastResponseTime} milliseconds`}
                   >
                     ⚡ {performanceMetrics.lastResponseTime}ms
-                  </span>
+                  </Badge>
                 )}
                 {suggestions.length > 0 && (
-                  <span 
-                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
+                  <Badge 
+                    variant="outline"
+                    className="text-xs font-medium border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-700 dark:bg-purple-900/50 dark:text-purple-200"
                     aria-label={`${suggestions.filter(s => s.status === 'pending').length} active grammar suggestions`}
                   >
                     🎯 {suggestions.filter(s => s.status === 'pending').length} active
-                  </span>
+                  </Badge>
                 )}
               </div>
             </div>
             <div className="flex items-center space-x-3">
               <KeyboardShortcuts />
               <ThemeToggle />
-              <button
+              <Button
                 onClick={saveDocument}
                 disabled={isSaving}
-                className="group relative px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transform transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center space-x-2 font-medium"
+                size="lg"
+                className="flex items-center gap-2 font-medium"
               >
                 {isSaving ? (
                   <>
@@ -722,27 +727,31 @@ const Editor = () => {
                     <span>Save</span>
                   </>
                 )}
-              </button>
-                              <button
+              </Button>
+                              <Button
                   onClick={() => exportDocument('pdf')}
-                  className="group relative px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl hover:from-emerald-700 hover:to-green-800 transform transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center space-x-2 font-medium"
+                  size="lg"
+                  variant="secondary"
+                  className="flex items-center gap-2 font-medium"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <span>Export PDF</span>
-                </button>
+                </Button>
                 {process.env.NODE_ENV === 'development' && (
-                  <button
+                  <Button
                     onClick={() => {
                       // Test Sentry error reporting
                       throw new Error('Test error for Sentry monitoring');
                     }}
-                    className="px-3 py-2 bg-red-600 text-white text-xs rounded-md hover:bg-red-700 transition-colors"
+                    variant="destructive"
+                    size="sm"
+                    className="text-xs"
                     title="Test Sentry (Development only)"
                   >
                     🐛 Test
-                  </button>
+                  </Button>
                 )}
             </div>
           </div>
@@ -756,63 +765,56 @@ const Editor = () => {
               <div className="border-b border-slate-200/50 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-800/50 p-3 lg:p-4 transition-colors duration-300">
                 <div className="flex items-center space-x-1 lg:space-x-2 flex-wrap gap-1">
                 {/* Undo/Redo */}
-                <button
+                <Button
                   onClick={() => tiptapEditor.chain().focus().undo().run()}
                   disabled={!tiptapEditor.can().undo()}
-                  className="p-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-30 transition-all duration-200 hover:scale-105 disabled:hover:scale-100 text-slate-700 dark:text-slate-300"
-                  title="Undo (Ctrl+Z)"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Undo (Ctrl+Z)"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                   </svg>
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => tiptapEditor.chain().focus().redo().run()}
                   disabled={!tiptapEditor.can().redo()}
-                  className="p-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-30 transition-all duration-200 hover:scale-105 disabled:hover:scale-100 text-slate-700 dark:text-slate-300"
-                  title="Redo (Ctrl+Y)"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Redo (Ctrl+Y)"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
                   </svg>
-                </button>
+                </Button>
                 <div className="w-px h-6 bg-slate-300 dark:bg-slate-600"></div>
                 
                                 {/* Formatting */}
-                <button
-                  onClick={() => tiptapEditor.chain().focus().toggleBold().run()}
-                  className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 ${
-                    tiptapEditor.isActive('bold') 
-                      ? 'bg-blue-500 dark:bg-blue-600 text-white shadow-md' 
-                      : 'hover:bg-blue-100 dark:hover:bg-blue-900/50 text-slate-700 dark:text-slate-300'
-                  }`}
-                  title="Bold (Ctrl+B)"
+                <Toggle
+                  pressed={tiptapEditor.isActive('bold')}
+                  onPressedChange={() => tiptapEditor.chain().focus().toggleBold().run()}
+                  size="sm"
+                  aria-label="Bold (Ctrl+B)"
                 >
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M5 2a1 1 0 000 2v12a1 1 0 001 1h4.5a4.5 4.5 0 001.242-8.757A4 4 0 0010.5 2H5zm5.5 6A2.5 2.5 0 008 5.5V8h2.5zM8 10v2.5a2.5 2.5 0 002.5 2.5H12a2.5 2.5 0 000-5H8z" />
                   </svg>
-                </button>
-                <button
-                  onClick={() => tiptapEditor.chain().focus().toggleItalic().run()}
-                  className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 ${
-                    tiptapEditor.isActive('italic') 
-                      ? 'bg-blue-500 dark:bg-blue-600 text-white shadow-md' 
-                      : 'hover:bg-blue-100 dark:hover:bg-blue-900/50 text-slate-700 dark:text-slate-300'
-                  }`}
-                  title="Italic (Ctrl+I)"
+                </Toggle>
+                <Toggle
+                  pressed={tiptapEditor.isActive('italic')}
+                  onPressedChange={() => tiptapEditor.chain().focus().toggleItalic().run()}
+                  size="sm"
+                  aria-label="Italic (Ctrl+I)"
                 >
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M8 1a1 1 0 000 2h2.5L7 13H5a1 1 0 100 2h6a1 1 0 100-2H8.5l3.5-10H14a1 1 0 100-2H8z" />
                   </svg>
-                </button>
-                <button
-                  onClick={() => tiptapEditor.chain().focus().toggleStrike().run()}
-                  className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 ${
-                    tiptapEditor.isActive('strike') 
-                      ? 'bg-blue-500 dark:bg-blue-600 text-white shadow-md' 
-                      : 'hover:bg-blue-100 dark:hover:bg-blue-900/50 text-slate-700 dark:text-slate-300'
-                  }`}
-                  title="Strikethrough"
+                </Toggle>
+                <Toggle
+                  pressed={tiptapEditor.isActive('strike')}
+                  onPressedChange={() => tiptapEditor.chain().focus().toggleStrike().run()}
+                  size="sm"
+                  aria-label="Strikethrough"
                 >
                   <span className="inline-flex items-center justify-center w-4 h-4 font-bold text-xs relative">
                     <span className="relative">
@@ -822,7 +824,7 @@ const Editor = () => {
                       </div>
                     </span>
                   </span>
-                </button>
+                </Toggle>
                 <div className="w-px h-6 bg-slate-300 dark:bg-slate-600"></div>
                   <button
                     onClick={() => tiptapEditor.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -970,12 +972,13 @@ const Editor = () => {
                 </svg>
                 Smart Suggestions
                 {suggestions.filter(s => s.status === 'pending').length > 0 && (
-                  <span 
-                    className="ml-auto bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs px-3 py-1 rounded-full font-medium shadow-lg"
+                  <Badge 
+                    variant="destructive"
+                    className="ml-auto text-xs font-medium"
                     aria-label={`${suggestions.filter(s => s.status === 'pending').length} pending suggestions`}
                   >
                     {suggestions.filter(s => s.status === 'pending').length}
-                  </span>
+                  </Badge>
                 )}
               </h2>
               

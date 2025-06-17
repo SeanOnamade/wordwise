@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#3b82f6',
+  themeColor: '#4f46e5',
 };
 
 export default function RootLayout({
@@ -41,14 +41,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`dark ${inter.variable}`}>
       <head>
-        <meta name="color-scheme" content="light" />
+        <meta name="color-scheme" content="dark" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body 
-        className={`${inter.className} font-sans bg-white text-gray-900 antialiased`}
+        className={`${inter.className} font-sans bg-slate-900 text-slate-100 antialiased`}
         suppressHydrationWarning={true}
       >
         {/* Skip to main content link for screen readers */}

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,43 +8,58 @@
   :root {
     /* Light mode colors */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
+    --card-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
   }
 
   .dark {
     /* Dark mode colors */
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
   }
 
   * {
@@ -159,6 +176,56 @@
     @apply outline-none;
   }
 
+  /* Override dark mode text for light editor canvas */
+  .editor-light-canvas .ProseMirror {
+    color: #1e293b !important; /* slate-800 for good contrast on light background */
+  }
+
+  .editor-light-canvas .ProseMirror p {
+    color: #1e293b !important;
+  }
+
+  .editor-light-canvas .ProseMirror h1,
+  .editor-light-canvas .ProseMirror h2,
+  .editor-light-canvas .ProseMirror h3,
+  .editor-light-canvas .ProseMirror h4,
+  .editor-light-canvas .ProseMirror h5,
+  .editor-light-canvas .ProseMirror h6 {
+    color: #0f172a !important; /* slate-900 for headings */
+  }
+
+  .editor-light-canvas .ProseMirror li {
+    color: #1e293b !important;
+  }
+
+  .editor-light-canvas .ProseMirror blockquote {
+    color: #475569 !important; /* slate-600 for quotes */
+  }
+
+  /* Ensure all text elements are visible */
+  .editor-light-canvas .ProseMirror * {
+    color: #1e293b !important;
+  }
+
+  .editor-light-canvas .ProseMirror strong {
+    color: #0f172a !important;
+    font-weight: 700 !important;
+  }
+
+  .editor-light-canvas .ProseMirror em {
+    color: #1e293b !important;
+    font-style: italic !important;
+  }
+
+  /* Fix placeholder text */
+  .editor-light-canvas .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: #94a3b8 !important; /* slate-400 for placeholder */
+    pointer-events: none;
+    float: left;
+    height: 0;
+  }
+
   .ProseMirror p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);
     @apply text-gray-400 pointer-events-none float-left h-0;
@@ -224,73 +291,83 @@
   /* Enhanced inline highlighting decorations with underlines */
   .hl-grammar {
     background: rgba(255, 235, 230, 0.65) !important;
-    border-radius: 3px !important;
+    border-radius: 2px !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    padding: 1px 2px !important;
+    padding: 0 1px !important;
     border-bottom: 2px solid #ef4444 !important;
     text-decoration: underline !important;
     text-decoration-color: #ef4444 !important;
     text-decoration-style: wavy !important;
     text-underline-offset: 2px !important;
     position: relative !important;
+    display: inline !important;
+    line-height: inherit !important;
   }
 
   .hl-fluency {
     background: rgba(235, 245, 255, 0.65) !important;
-    border-radius: 3px !important;
+    border-radius: 2px !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    padding: 1px 2px !important;
+    padding: 0 1px !important;
     border-bottom: 2px solid #3b82f6 !important;
     text-decoration: underline !important;
     text-decoration-color: #3b82f6 !important;
     text-decoration-style: wavy !important;
     text-underline-offset: 2px !important;
     position: relative !important;
+    display: inline !important;
+    line-height: inherit !important;
   }
 
   .hl-tone {
     background: rgba(235, 255, 235, 0.65) !important;
-    border-radius: 3px !important;
+    border-radius: 2px !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    padding: 1px 2px !important;
+    padding: 0 1px !important;
     border-bottom: 2px solid #10b981 !important;
     text-decoration: underline !important;
     text-decoration-color: #10b981 !important;
     text-decoration-style: wavy !important;
     text-underline-offset: 2px !important;
     position: relative !important;
+    display: inline !important;
+    line-height: inherit !important;
   }
 
   /* Support for existing suggestion types with enhanced styling */
   .hl-spelling {
     background: rgba(235, 245, 255, 0.65) !important;
-    border-radius: 3px !important;
+    border-radius: 2px !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    padding: 1px 2px !important;
+    padding: 0 1px !important;
     border-bottom: 2px solid #3b82f6 !important;
     text-decoration: underline !important;
     text-decoration-color: #3b82f6 !important;
     text-decoration-style: wavy !important;
     text-underline-offset: 2px !important;
     position: relative !important;
+    display: inline !important;
+    line-height: inherit !important;
   }
 
   .hl-style {
     background: rgba(255, 251, 235, 0.65) !important;
-    border-radius: 3px !important;
+    border-radius: 2px !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    padding: 1px 2px !important;
+    padding: 0 1px !important;
     border-bottom: 2px solid #f59e0b !important;
     text-decoration: underline !important;
     text-decoration-color: #f59e0b !important;
     text-decoration-style: wavy !important;
     text-underline-offset: 2px !important;
     position: relative !important;
+    display: inline !important;
+    line-height: inherit !important;
   }
 
   /* Enhanced hover effects for inline highlights */
@@ -409,41 +486,73 @@
   /* Enhanced list styling with better inline behavior */
   .ProseMirror ul, .ProseMirror ol {
     @apply pl-6 my-2;
+    margin-block-start: 0.5em;
+    margin-block-end: 0.5em;
   }
 
   .ProseMirror ul li {
     @apply list-disc;
-    display: list-item;
+    display: list-item !important;
     line-height: 1.6;
+    margin: 0.1em 0 !important;
+    padding: 0 !important;
   }
 
   .ProseMirror ol li {
     @apply list-decimal;
-    display: list-item;
+    display: list-item !important;
     line-height: 1.6;
+    margin: 0.1em 0 !important;
+    padding: 0 !important;
   }
 
-  /* Allow inline content within list items */
+  /* Ensure paragraphs inside list items don't create new lines */
+  .ProseMirror li p {
+    display: inline !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Fix for TipTap specific list classes */
   .ProseMirror .editor-list-item {
     display: list-item !important;
-    margin: 0.2em 0 !important;
+    margin: 0.1em 0 !important;
+    padding: 0 !important;
   }
 
   .ProseMirror .editor-list-item p {
     display: inline !important;
     margin: 0 !important;
+    padding: 0 !important;
   }
 
   /* Prevent forced line breaks in list items */
   .ProseMirror .editor-bullet-list,
   .ProseMirror .editor-ordered-list {
     margin: 0.5em 0 !important;
+    padding-left: 1.5rem !important;
   }
 
   .ProseMirror .editor-bullet-list li,
   .ProseMirror .editor-ordered-list li {
     margin: 0.1em 0 !important;
     padding: 0 !important;
+    list-style-position: outside !important;
+  }
+
+  /* Specific fixes for content flowing naturally */
+  .ProseMirror li > * {
+    display: inline !important;
+  }
+
+  .ProseMirror li > p:first-child {
+    display: inline !important;
+    margin: 0 !important;
+  }
+
+  .ProseMirror li > p:not(:first-child) {
+    display: block !important;
+    margin-top: 0.5em !important;
   }
 
   .ProseMirror blockquote {
@@ -472,5 +581,16 @@
 
   .ProseMirror pre code {
     @apply bg-transparent p-0;
+  }
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 } 
