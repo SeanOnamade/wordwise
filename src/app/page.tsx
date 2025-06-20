@@ -1,36 +1,43 @@
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center">
-          <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
+          <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-white sm:text-5xl md:text-6xl">
             <span className="block">Welcome to</span>
-            <span className="block text-blue-600">WordWise</span>
+            <span className="block text-blue-600 dark:text-blue-400">WordWise</span>
           </h1>
-          <p className="mt-3 max-w-md mx-auto text-base text-gray-500 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
+          <p className="mt-3 max-w-md mx-auto text-base text-gray-500 dark:text-gray-300 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
             Improve your academic writing with real-time grammar and style suggestions.
             Perfect for ESL students looking to enhance their essays.
           </p>
           <div className="mt-5 max-w-md mx-auto sm:flex sm:justify-center md:mt-8">
             <div className="rounded-md shadow">
-              <Link
-                href="/editor"
-                className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 md:py-4 md:text-lg md:px-10"
+              <Button 
+                asChild 
+                size="lg"
+                className="w-full sm:w-auto px-8 py-3 md:py-4 md:px-10 text-base md:text-lg font-medium transition-all duration-200 hover:scale-105 hover:shadow-lg"
               >
-                Get Started
-              </Link>
+                <Link href="/editor">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Get Started
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Features Section */}
-        <div className="mt-32">
+        <div className="mt-20">
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {/* Feature 1 */}
             <div className="pt-6">
-              <div className="flow-root bg-white rounded-lg px-6 pb-8">
+              <div className="flow-root bg-white dark:bg-gray-800 rounded-lg px-6 pb-8 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-300">
                 <div className="-mt-6">
                   <div className="inline-flex items-center justify-center p-3 bg-blue-500 rounded-md shadow-lg">
                     <svg
@@ -43,15 +50,15 @@ export default function Home() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                       />
                     </svg>
                   </div>
-                  <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">
-                    Real-time Suggestions
+                  <h3 className="mt-8 text-lg font-medium text-gray-900 dark:text-white tracking-tight">
+                    Real-time Grammar Check
                   </h3>
-                  <p className="mt-5 text-base text-gray-500">
-                    Get instant feedback on grammar, style, and academic tone as you write.
+                  <p className="mt-5 text-base text-gray-500 dark:text-gray-300">
+                    Get instant feedback on grammar, spelling, and style as you write.
                   </p>
                 </div>
               </div>
@@ -59,7 +66,7 @@ export default function Home() {
 
             {/* Feature 2 */}
             <div className="pt-6">
-              <div className="flow-root bg-white rounded-lg px-6 pb-8">
+              <div className="flow-root bg-white dark:bg-gray-800 rounded-lg px-6 pb-8 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-300">
                 <div className="-mt-6">
                   <div className="inline-flex items-center justify-center p-3 bg-blue-500 rounded-md shadow-lg">
                     <svg
@@ -76,10 +83,10 @@ export default function Home() {
                       />
                     </svg>
                   </div>
-                  <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">
+                  <h3 className="mt-8 text-lg font-medium text-gray-900 dark:text-white tracking-tight">
                     Smart Corrections
                   </h3>
-                  <p className="mt-5 text-base text-gray-500">
+                  <p className="mt-5 text-base text-gray-500 dark:text-gray-300">
                     Accept or reject suggestions with a single click, and learn from detailed explanations.
                   </p>
                 </div>
@@ -88,7 +95,7 @@ export default function Home() {
 
             {/* Feature 3 */}
             <div className="pt-6">
-              <div className="flow-root bg-white rounded-lg px-6 pb-8">
+              <div className="flow-root bg-white dark:bg-gray-800 rounded-lg px-6 pb-8 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-300">
                 <div className="-mt-6">
                   <div className="inline-flex items-center justify-center p-3 bg-blue-500 rounded-md shadow-lg">
                     <svg
@@ -105,10 +112,10 @@ export default function Home() {
                       />
                     </svg>
                   </div>
-                  <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">
+                  <h3 className="mt-8 text-lg font-medium text-gray-900 dark:text-white tracking-tight">
                     Easy Export
                   </h3>
-                  <p className="mt-5 text-base text-gray-500">
+                  <p className="mt-5 text-base text-gray-500 dark:text-gray-300">
                     Export your polished essays directly to DOCX or PDF format.
                   </p>
                 </div>

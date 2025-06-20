@@ -8,6 +8,7 @@ import SuggestionDrawer from './components/SuggestionDrawer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import TipTapEditor from './components/TipTapEditor';
+import { useAutosave } from '@/hooks/useAutosave';
 
 interface EditorShellProps {
   user: any;
@@ -52,6 +53,13 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
 
     return () => clearTimeout(saveTimer);
   }, [currentDoc?.content]);
+
+  // Integrate Firestore autosave
+  useAutosave({
+    docId: currentDoc?.id || '',
+    content: currentDoc?.content || '',
+    enabled: !!currentDoc?.id && !!auth?.currentUser && typeof window !== 'undefined'
+  });
 
   const handleContentChange = (content: string) => {
     if (currentDoc) {

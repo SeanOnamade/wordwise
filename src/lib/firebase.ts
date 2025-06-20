@@ -2,7 +2,7 @@
 
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, setLogLevel } from 'firebase/firestore';
 import { getPerformance, trace } from 'firebase/performance';
 
 const firebaseConfig = {
@@ -25,6 +25,9 @@ if (typeof window !== 'undefined') {
   auth = getAuth(app);
   db = getFirestore(app);
   perf = getPerformance(app);
+  
+  // Enable Firestore debug logging
+  setLogLevel('debug');
 }
 
 // Enhanced performance monitoring helper

@@ -81,28 +81,64 @@
   }
 
   .dark .hl-grammar {
-    background: rgba(239, 68, 68, 0.2) !important;
-    border-bottom-color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.25) !important;
+    border-bottom-color: #fca5a5 !important;
+    text-decoration-color: #fca5a5 !important;
+    box-shadow: 0 1px 3px rgba(239, 68, 68, 0.2) !important;
   }
 
   .dark .hl-spelling {
-    background: rgba(59, 130, 246, 0.2) !important;
-    border-bottom-color: #3b82f6 !important;
+    background: rgba(59, 130, 246, 0.25) !important;
+    border-bottom-color: #93c5fd !important;
+    text-decoration-color: #93c5fd !important;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.2) !important;
   }
 
   .dark .hl-style {
-    background: rgba(245, 158, 11, 0.2) !important;
-    border-bottom-color: #f59e0b !important;
+    background: rgba(245, 158, 11, 0.25) !important;
+    border-bottom-color: #fbbf24 !important;
+    text-decoration-color: #fbbf24 !important;
+    box-shadow: 0 1px 3px rgba(245, 158, 11, 0.2) !important;
   }
 
   .dark .hl-fluency {
-    background: rgba(59, 130, 246, 0.2) !important;
-    border-bottom-color: #3b82f6 !important;
+    background: rgba(59, 130, 246, 0.25) !important;
+    border-bottom-color: #93c5fd !important;
+    text-decoration-color: #93c5fd !important;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.2) !important;
   }
 
   .dark .hl-tone {
-    background: rgba(16, 185, 129, 0.2) !important;
-    border-bottom-color: #10b981 !important;
+    background: rgba(16, 185, 129, 0.25) !important;
+    border-bottom-color: #6ee7b7 !important;
+    text-decoration-color: #6ee7b7 !important;
+    box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2) !important;
+  }
+
+  /* Dark mode hover effects */
+  .dark .hl-grammar:hover {
+    background: rgba(239, 68, 68, 0.35) !important;
+    box-shadow: 0 3px 8px rgba(239, 68, 68, 0.3) !important;
+  }
+
+  .dark .hl-spelling:hover {
+    background: rgba(59, 130, 246, 0.35) !important;
+    box-shadow: 0 3px 8px rgba(59, 130, 246, 0.3) !important;
+  }
+
+  .dark .hl-style:hover {
+    background: rgba(245, 158, 11, 0.35) !important;
+    box-shadow: 0 3px 8px rgba(245, 158, 11, 0.3) !important;
+  }
+
+  .dark .hl-fluency:hover {
+    background: rgba(59, 130, 246, 0.35) !important;
+    box-shadow: 0 3px 8px rgba(59, 130, 246, 0.3) !important;
+  }
+
+  .dark .hl-tone:hover {
+    background: rgba(16, 185, 129, 0.35) !important;
+    box-shadow: 0 3px 8px rgba(16, 185, 129, 0.3) !important;
   }
 
   /* High contrast mode detection */
@@ -288,127 +324,124 @@
     filter: brightness(0.95) !important;
   }
 
-  /* Enhanced inline highlighting decorations with underlines */
+  /* Enhanced inline highlighting decorations with improved accessibility */
   .hl-grammar {
-    background: rgba(255, 235, 230, 0.65) !important;
-    border-radius: 2px !important;
+    @apply bg-red-300/20 underline decoration-red-400;
+    border-radius: 3px !important;
     cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    padding: 0 1px !important;
-    border-bottom: 2px solid #ef4444 !important;
-    text-decoration: underline !important;
-    text-decoration-color: #ef4444 !important;
+    transition: all 0.15s ease !important;
+    padding: 1px 2px !important;
     text-decoration-style: wavy !important;
-    text-underline-offset: 2px !important;
+    text-decoration-thickness: 2px !important;
+    text-underline-offset: 3px !important;
     position: relative !important;
     display: inline !important;
     line-height: inherit !important;
+    box-shadow: 0 1px 3px rgba(239, 68, 68, 0.1) !important;
+    margin-left: 0 !important;
+    left: 0 !important;
   }
 
   .hl-fluency {
-    background: rgba(235, 245, 255, 0.65) !important;
-    border-radius: 2px !important;
+    @apply bg-blue-300/20 underline decoration-blue-400;
+    border-radius: 3px !important;
     cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    padding: 0 1px !important;
-    border-bottom: 2px solid #3b82f6 !important;
-    text-decoration: underline !important;
-    text-decoration-color: #3b82f6 !important;
+    transition: all 0.15s ease !important;
+    padding: 1px 2px !important;
     text-decoration-style: wavy !important;
-    text-underline-offset: 2px !important;
+    text-decoration-thickness: 2px !important;
+    text-underline-offset: 3px !important;
     position: relative !important;
     display: inline !important;
     line-height: inherit !important;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1) !important;
   }
 
   .hl-tone {
-    background: rgba(235, 255, 235, 0.65) !important;
-    border-radius: 2px !important;
+    @apply bg-green-300/20 underline decoration-green-400;
+    border-radius: 3px !important;
     cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    padding: 0 1px !important;
-    border-bottom: 2px solid #10b981 !important;
-    text-decoration: underline !important;
-    text-decoration-color: #10b981 !important;
+    transition: all 0.15s ease !important;
+    padding: 1px 2px !important;
     text-decoration-style: wavy !important;
-    text-underline-offset: 2px !important;
+    text-decoration-thickness: 2px !important;
+    text-underline-offset: 3px !important;
     position: relative !important;
     display: inline !important;
     line-height: inherit !important;
+    box-shadow: 0 1px 3px rgba(16, 185, 129, 0.1) !important;
   }
 
   /* Support for existing suggestion types with enhanced styling */
   .hl-spelling {
-    background: rgba(235, 245, 255, 0.65) !important;
-    border-radius: 2px !important;
+    @apply bg-blue-300/20 underline decoration-blue-400;
+    border-radius: 3px !important;
     cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    padding: 0 1px !important;
-    border-bottom: 2px solid #3b82f6 !important;
-    text-decoration: underline !important;
-    text-decoration-color: #3b82f6 !important;
+    transition: all 0.15s ease !important;
+    padding: 1px 2px !important;
     text-decoration-style: wavy !important;
-    text-underline-offset: 2px !important;
+    text-decoration-thickness: 2px !important;
+    text-underline-offset: 3px !important;
     position: relative !important;
     display: inline !important;
     line-height: inherit !important;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1) !important;
   }
 
   .hl-style {
-    background: rgba(255, 251, 235, 0.65) !important;
-    border-radius: 2px !important;
+    @apply bg-amber-300/20 underline decoration-amber-400;
+    border-radius: 3px !important;
     cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    padding: 0 1px !important;
-    border-bottom: 2px solid #f59e0b !important;
-    text-decoration: underline !important;
-    text-decoration-color: #f59e0b !important;
+    transition: all 0.15s ease !important;
+    padding: 1px 2px !important;
     text-decoration-style: wavy !important;
-    text-underline-offset: 2px !important;
+    text-decoration-thickness: 2px !important;
+    text-underline-offset: 3px !important;
     position: relative !important;
     display: inline !important;
     line-height: inherit !important;
+    box-shadow: 0 1px 3px rgba(245, 158, 11, 0.1) !important;
   }
 
-  /* Enhanced hover effects for inline highlights */
+  /* Enhanced hover effects with better visual feedback */
   .hl-grammar:hover {
-    background: rgba(255, 235, 230, 0.85) !important;
+    background: rgba(255, 235, 230, 0.9) !important;
     transform: scale(1.02) !important;
-    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
+    box-shadow: 0 3px 8px rgba(239, 68, 68, 0.25) !important;
     border-bottom-width: 3px !important;
-    text-decoration-thickness: 2px !important;
+    text-decoration-thickness: 3px !important;
   }
 
   .hl-fluency:hover {
-    background: rgba(235, 245, 255, 0.85) !important;
+    background: rgba(235, 245, 255, 0.9) !important;
     transform: scale(1.02) !important;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 0 3px 8px rgba(59, 130, 246, 0.25) !important;
     border-bottom-width: 3px !important;
-    text-decoration-thickness: 2px !important;
+    text-decoration-thickness: 3px !important;
   }
 
   .hl-tone:hover {
-    background: rgba(235, 255, 235, 0.85) !important;
+    background: rgba(235, 255, 235, 0.9) !important;
     transform: scale(1.02) !important;
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3) !important;
+    box-shadow: 0 3px 8px rgba(16, 185, 129, 0.25) !important;
     border-bottom-width: 3px !important;
-    text-decoration-thickness: 2px !important;
+    text-decoration-thickness: 3px !important;
   }
 
   .hl-spelling:hover {
-    background: rgba(235, 245, 255, 0.85) !important;
+    background: rgba(235, 245, 255, 0.9) !important;
     transform: scale(1.02) !important;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 0 3px 8px rgba(59, 130, 246, 0.25) !important;
     border-bottom-width: 3px !important;
-    text-decoration-thickness: 2px !important;
+    text-decoration-thickness: 3px !important;
   }
 
   .hl-style:hover {
-    background: rgba(255, 251, 235, 0.85) !important;
+    background: rgba(255, 251, 235, 0.9) !important;
     transform: scale(1.02) !important;
-    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3) !important;
+    box-shadow: 0 3px 8px rgba(245, 158, 11, 0.25) !important;
     border-bottom-width: 3px !important;
-    text-decoration-thickness: 2px !important;
+    text-decoration-thickness: 3px !important;
   }
 
   /* Exact inline suggestion decoration classes as requested */
@@ -484,75 +517,68 @@
   }
 
   /* Enhanced list styling with better inline behavior */
-  .ProseMirror ul, .ProseMirror ol {
+  .ProseMirror ul,
+  .ProseMirror ol {
     @apply pl-6 my-2;
     margin-block-start: 0.5em;
     margin-block-end: 0.5em;
+    list-style-position: outside !important;
   }
 
-  .ProseMirror ul li {
-    @apply list-disc;
+  /* Prevent forced line breaks in list items */
+  .ProseMirror ul li,
+  .ProseMirror ol li,
+  .ProseMirror .editor-list-item {
     display: list-item !important;
     line-height: 1.6;
-    margin: 0.1em 0 !important;
+    margin: 0.2em 0 !important;
     padding: 0 !important;
+    list-style-position: outside !important;
+    white-space: normal !important;
   }
 
-  .ProseMirror ol li {
-    @apply list-decimal;
-    display: list-item !important;
-    line-height: 1.6;
-    margin: 0.1em 0 !important;
-    padding: 0 !important;
-  }
-
-  /* Ensure paragraphs inside list items don't create new lines */
+  /* Allow inline content in list items */
   .ProseMirror li p {
     display: inline !important;
     margin: 0 !important;
     padding: 0 !important;
+    line-height: inherit !important;
   }
 
   /* Fix for TipTap specific list classes */
-  .ProseMirror .editor-list-item {
-    display: list-item !important;
-    margin: 0.1em 0 !important;
-    padding: 0 !important;
-  }
-
-  .ProseMirror .editor-list-item p {
-    display: inline !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  /* Prevent forced line breaks in list items */
   .ProseMirror .editor-bullet-list,
   .ProseMirror .editor-ordered-list {
     margin: 0.5em 0 !important;
     padding-left: 1.5rem !important;
-  }
-
-  .ProseMirror .editor-bullet-list li,
-  .ProseMirror .editor-ordered-list li {
-    margin: 0.1em 0 !important;
-    padding: 0 !important;
     list-style-position: outside !important;
   }
 
-  /* Specific fixes for content flowing naturally */
+  /* Enhanced spacing for nested lists */
+  .ProseMirror li ul,
+  .ProseMirror li ol {
+    margin-top: 0.3em !important;
+    margin-bottom: 0.3em !important;
+    padding-left: 1.2rem !important;
+  }
+
+  /* Fix for mixed content in list items */
+  .ProseMirror li > span,
+  .ProseMirror li > strong,
+  .ProseMirror li > em,
+  .ProseMirror li > code {
+    display: inline !important;
+    vertical-align: baseline !important;
+  }
+
+  /* Fix for list item spacing */
+  .ProseMirror li + li {
+    margin-top: 0.2em !important;
+  }
+
+  /* Ensure proper text wrapping in list items */
   .ProseMirror li > * {
-    display: inline !important;
-  }
-
-  .ProseMirror li > p:first-child {
-    display: inline !important;
-    margin: 0 !important;
-  }
-
-  .ProseMirror li > p:not(:first-child) {
-    display: block !important;
-    margin-top: 0.5em !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
   }
 
   .ProseMirror blockquote {

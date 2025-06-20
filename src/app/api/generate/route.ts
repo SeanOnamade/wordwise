@@ -390,14 +390,24 @@ const generateMockSuggestions = (text: string) => {
       // Special cases that should not preserve case (use replacement as-is)
       const forceOriginalCase = ['CAPITALIZE_I']; // "i" should always become "I" regardless of context
       
+      // Get exact word boundaries for more accurate highlighting
+      const text = match[0];
+      const wordStart = text.search(/\S/);
+      const wordEnd = text.search(/\s+$/) === -1 ? text.length : text.search(/\s+$/);
+      
+      // Calculate the actual position in the document, accounting for list indentation
+      const lineStart = text.lastIndexOf('\n', match.index) + 1;
+      const linePrefix = text.slice(lineStart, match.index);
+      const listOffset = linePrefix.match(/^[\s•\-\d.]*\s*/)?.[0].length || 0;
+      
       const suggestion = {
         range: {
-          from: match.index,
-          to: match.index + match[0].length,
+          from: match.index + wordStart + 1 - listOffset,
+          to: match.index + wordEnd + 1 - listOffset,
         },
         type: rule.type,
-        original: match[0],
-        replacement: forceOriginalCase.includes(rule.rule) ? rawReplacement : preserveCase(match[0], rawReplacement),
+        original: text.slice(wordStart, wordEnd),
+        replacement: forceOriginalCase.includes(rule.rule) ? rawReplacement : preserveCase(text.slice(wordStart, wordEnd), rawReplacement),
         ruleKey: rule.rule,
         explanation: rule.message,
       };
@@ -453,19 +463,30 @@ export async function POST(request: Request) {
       const duration = Date.now() - startTime;
       console.log(`LanguageTool response time: ${duration}ms`);
 
-      // Transform LanguageTool response into our suggestion format
-      const suggestions = data.matches?.map((match: any) => ({
-        range: {
-          from: match.offset,
-          to: match.offset + match.length,
-        },
-        type: match.rule?.category?.id === 'TYPOS' ? 'spelling' : 
-              match.rule?.category?.id === 'STYLE' ? 'style' : 'grammar',
-        original: text.slice(match.offset, match.offset + match.length),
-        replacement: match.replacements?.[0]?.value || '',
-        ruleKey: match.rule?.id || 'UNKNOWN',
-        explanation: match.message || 'Grammar suggestion',
-      })) || [];
+      // Transform LanguageTool response into our suggestion format with exact word boundaries
+      const suggestions = data.matches?.map((match: any) => {
+        const matchText = text.slice(match.offset, match.offset + match.length);
+        const wordStart = matchText.search(/\S/);
+        const wordEnd = matchText.search(/\s+$/) === -1 ? matchText.length : matchText.search(/\s+$/);
+        
+        // Calculate list indentation offset
+        const lineStart = text.lastIndexOf('\n', match.offset) + 1;
+        const linePrefix = text.slice(lineStart, match.offset);
+        const listOffset = linePrefix.match(/^[\s•\-\d.]*\s*/)?.[0].length || 0;
+        
+        return {
+          range: {
+            from: match.offset + wordStart - listOffset,
+            to: match.offset + wordEnd - listOffset,
+          },
+          type: match.rule?.category?.id === 'TYPOS' ? 'spelling' : 
+                match.rule?.category?.id === 'STYLE' ? 'style' : 'grammar',
+          original: matchText.slice(wordStart, wordEnd),
+          replacement: match.replacements?.[0]?.value || '',
+          ruleKey: match.rule?.id || 'UNKNOWN',
+          explanation: match.message || 'Grammar suggestion',
+        };
+      }) || [];
 
       return NextResponse.json({ 
         suggestions,

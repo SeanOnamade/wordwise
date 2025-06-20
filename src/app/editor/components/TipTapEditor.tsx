@@ -5,6 +5,7 @@ import { Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Color } from '@tiptap/extension-color';
 import { Highlight } from '@tiptap/extension-highlight';
+import { Underline } from '@tiptap/extension-underline';
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
@@ -136,6 +137,7 @@ export default function TipTapEditor({
         class: 'custom-highlight',
       },
     }),
+    Underline,
     SuggestionHighlightExtension,
   ], []); // Empty dependency array - these never change
   
@@ -283,6 +285,21 @@ export default function TipTapEditor({
           </svg>
         </button>
 
+        {/* Underline */}
+        <button
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          className={`p-1.5 rounded transition-colors ${
+            editor.isActive('underline') 
+              ? 'bg-indigo-500 text-white' 
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+          }`}
+          title="Underline"
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M4 16h12v1H4v-1zM6 3v6a4 4 0 008 0V3h-1v6a3 3 0 01-6 0V3H6z" />
+          </svg>
+        </button>
+
         {/* H1 */}
         <button
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -370,6 +387,19 @@ export default function TipTapEditor({
           title="Italic"
         >
           I
+        </button>
+
+        {/* Underline */}
+        <button
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          className={`px-3 py-1 text-sm underline rounded-lg transition-colors hover:bg-slate-700/50 ${
+            editor.isActive('underline') 
+              ? 'bg-indigo-500 text-white' 
+              : 'text-slate-200 hover:text-white'
+          }`}
+          title="Underline"
+        >
+          U
         </button>
 
         {/* H1 */}

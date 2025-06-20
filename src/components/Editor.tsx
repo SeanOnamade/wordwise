@@ -5,10 +5,17 @@ import { Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Color } from '@tiptap/extension-color';
 import { Highlight } from '@tiptap/extension-highlight';
+import { Underline } from '@tiptap/extension-underline';
+import { Link } from '@tiptap/extension-link';
+import { TextAlign } from '@tiptap/extension-text-align';
+import { Superscript } from '@tiptap/extension-superscript';
+import { Subscript } from '@tiptap/extension-subscript';
+import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
 import { GrammarHighlight } from '@/lib/tiptap-extensions';
 import { useEditorStore } from '@/store/editorStore';
 import { useEffect, useCallback, useState } from 'react';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { useAutosave } from '@/hooks/useAutosave';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { auth, createPerformanceTrace } from '@/lib/firebase';
 import ThemeToggle from './ThemeToggle';
@@ -122,11 +129,15 @@ const Editor = () => {
     extensions: [
       StarterKit.configure({
         bulletList: {
+          keepMarks: true,
+          keepAttributes: true,
           HTMLAttributes: {
             class: 'editor-bullet-list',
           },
         },
         orderedList: {
+          keepMarks: true,
+          keepAttributes: true,
           HTMLAttributes: {
             class: 'editor-ordered-list',
           },
@@ -141,6 +152,17 @@ const Editor = () => {
       Highlight.configure({
         multicolor: true,
       }),
+      Underline,
+      Link.configure({
+        openOnClick: true,
+        HTMLAttributes: {
+          class: 'text-blue-600 hover:text-blue-800 underline',
+        },
+      }),
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+        alignments: ['left', 'center', 'right', 'justify'],
+      }),
       GrammarHighlight,
       createGrammarHighlightExtension(suggestions),
     ],
@@ -149,14 +171,59 @@ const Editor = () => {
     onUpdate: ({ editor }) => {
       const content = editor.getHTML();
       const text = editor.getText();
-      setWordCount(text.trim().split(/\s+/).filter(word => word.length > 0).length);
+      
+      console.log('✍️ Editor update triggered');
+      
+      // Update word count
+      const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+      setWordCount(words.length);
       
       // Update current doc content
       if (currentDoc) {
+        console.log('📝 Editor content updated:', { 
+          contentLength: content.length,
+          docId: currentDoc.id,
+          wordCount: words.length
+        });
+        
+        // Update store
         setCurrentDoc({
           ...currentDoc,
           content,
         });
+        
+        // Manual autosave
+        if (auth?.currentUser) {
+          console.log('💾 Triggering manual save to API');
+          const saveTimeout = setTimeout(async () => {
+            try {
+              const response = await fetch('/api/saveDoc', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  userId: auth.currentUser?.uid,
+                  docId: currentDoc.id,
+                  content,
+                  lastModified: new Date().toISOString()
+                }),
+              });
+
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              console.log('✅ Manual save successful');
+            } catch (error) {
+              console.error('❌ Manual save failed:', error);
+            }
+          }, 2000);
+
+          // Cleanup timeout on component unmount
+          return () => clearTimeout(saveTimeout);
+        }
+      } else {
+        console.warn('⚠️ No current document to update');
       }
       
       // Debounced grammar check
@@ -410,18 +477,52 @@ const Editor = () => {
     }
   }, [tiptapEditor, setEditor, suggestions, inlineActions.suggestionId]);
 
+  // Autosave integration
+  console.log('📄 Current document state:', { 
+    docId: currentDoc?.id, 
+    hasContent: !!currentDoc?.content,
+    isAuthenticated: !!auth?.currentUser 
+  });
+  
+  useAutosave({
+    docId: currentDoc?.id || '',
+    content: currentDoc?.content || '',
+    enabled: !!currentDoc?.id && !!auth?.currentUser
+  });
+
   // Load user documents on mount
   useEffect(() => {
     const loadUserDocuments = async () => {
-      if (typeof window === 'undefined' || !auth?.currentUser || currentDoc) return;
+      console.log('🔄 Checking document load conditions:', {
+        isClient: typeof window !== 'undefined',
+        isAuthenticated: !!auth?.currentUser,
+        hasCurrentDoc: !!currentDoc
+      });
+
+      if (typeof window === 'undefined' || !auth?.currentUser || currentDoc) {
+        console.log('⏭️ Skipping document load');
+        return;
+      }
       
       try {
+        console.log('📥 Loading documents for user:', auth.currentUser?.uid);
         const response = await fetch(`/api/saveDoc?userId=${auth.currentUser?.uid}`);
+        
         if (response.ok) {
           const data = await response.json();
+          console.log('📄 Documents loaded:', {
+            count: data.documents?.length || 0
+          });
+          
           if (data.documents && data.documents.length > 0) {
             // Load the most recent document
             const mostRecent = data.documents[0];
+            console.log('📝 Loading most recent document:', {
+              id: mostRecent.id,
+              title: mostRecent.title,
+              contentLength: mostRecent.content?.length
+            });
+            
             setCurrentDoc({
               id: mostRecent.id,
               title: mostRecent.title,
@@ -429,12 +530,15 @@ const Editor = () => {
             });
             return;
           }
+        } else {
+          console.error('❌ Failed to load documents:', response.status);
         }
       } catch (error) {
-        console.error('Failed to load user documents:', error);
+        console.error('❌ Failed to load user documents:', error);
       }
       
       // Create new document if no existing documents or failed to load
+      console.log('📄 Creating new document');
       const newDoc = {
         id: crypto.randomUUID(),
         title: 'Untitled Document',
@@ -811,20 +915,127 @@ const Editor = () => {
                   </svg>
                 </Toggle>
                 <Toggle
+                  pressed={tiptapEditor.isActive('underline')}
+                  onPressedChange={() => tiptapEditor.chain().focus().toggleUnderline().run()}
+                  size="sm"
+                  aria-label="Underline (Ctrl+U)"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M4 16h12v1H4v-1zM6 3v6a4 4 0 008 0V3h-1v6a3 3 0 01-6 0V3H6z" />
+                  </svg>
+                </Toggle>
+                <Toggle
                   pressed={tiptapEditor.isActive('strike')}
                   onPressedChange={() => tiptapEditor.chain().focus().toggleStrike().run()}
                   size="sm"
                   aria-label="Strikethrough"
                 >
-                  <span className="inline-flex items-center justify-center w-4 h-4 font-bold text-xs relative">
-                    <span className="relative">
-                      S
-                      <div className="absolute inset-0 flex items-center">
-                        <div className="w-full h-0.5 bg-current"></div>
-                      </div>
-                    </span>
-                  </span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 12h12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l8 0" opacity="0.5" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 15l8 0" opacity="0.5" />
+                  </svg>
                 </Toggle>
+
+                {/* Link */}
+                <Toggle
+                  pressed={tiptapEditor.isActive('link')}
+                  onPressedChange={() => {
+                    const url = window.prompt('Enter URL:');
+                    if (url) {
+                      tiptapEditor.chain().focus().setLink({ href: url }).run();
+                    }
+                  }}
+                  size="sm"
+                  aria-label="Add Link"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                </Toggle>
+
+                {/* Code Block */}
+                <Toggle
+                  pressed={tiptapEditor.isActive('codeBlock')}
+                  onPressedChange={() => tiptapEditor.chain().focus().toggleCodeBlock().run()}
+                  size="sm"
+                  aria-label="Code Block"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l-3 3 3 3M16 9l3 3-3 3M12 12h.01" />
+                  </svg>
+                </Toggle>
+
+                {/* Blockquote */}
+                <Toggle
+                  pressed={tiptapEditor.isActive('blockquote')}
+                  onPressedChange={() => tiptapEditor.chain().focus().toggleBlockquote().run()}
+                  size="sm"
+                  aria-label="Blockquote"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2z" />
+                  </svg>
+                </Toggle>
+
+                {/* Horizontal Rule */}
+                <Toggle
+                  pressed={false}
+                  onPressedChange={() => tiptapEditor.chain().focus().setHorizontalRule().run()}
+                  size="sm"
+                  aria-label="Horizontal Rule"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16" />
+                  </svg>
+                </Toggle>
+
+                <div className="w-px h-6 bg-slate-300 dark:bg-slate-600"></div>
+
+                {/* Text Alignment */}
+                <div className="flex space-x-1">
+                  <Toggle
+                    pressed={tiptapEditor.isActive({ textAlign: 'left' })}
+                    onPressedChange={() => tiptapEditor.chain().focus().setTextAlign('left').run()}
+                    size="sm"
+                    aria-label="Align Left"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h14" />
+                    </svg>
+                  </Toggle>
+                  <Toggle
+                    pressed={tiptapEditor.isActive({ textAlign: 'center' })}
+                    onPressedChange={() => tiptapEditor.chain().focus().setTextAlign('center').run()}
+                    size="sm"
+                    aria-label="Align Center"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M7 12h10M6 18h12" />
+                    </svg>
+                  </Toggle>
+                  <Toggle
+                    pressed={tiptapEditor.isActive({ textAlign: 'right' })}
+                    onPressedChange={() => tiptapEditor.chain().focus().setTextAlign('right').run()}
+                    size="sm"
+                    aria-label="Align Right"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M10 12h10M8 18h12" />
+                    </svg>
+                  </Toggle>
+                  <Toggle
+                    pressed={tiptapEditor.isActive({ textAlign: 'justify' })}
+                    onPressedChange={() => tiptapEditor.chain().focus().setTextAlign('justify').run()}
+                    size="sm"
+                    aria-label="Justify"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </Toggle>
+                </div>
+
                 <div className="w-px h-6 bg-slate-300 dark:bg-slate-600"></div>
                   <button
                     onClick={() => tiptapEditor.chain().focus().toggleHeading({ level: 1 }).run()}

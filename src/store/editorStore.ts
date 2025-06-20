@@ -57,7 +57,15 @@ export const useEditorStore = create<EditorState>((set) => ({
         s.id === id ? { ...s, status } : s
       ),
     })),
-  setCurrentDoc: (doc) => set({ currentDoc: doc }),
+  setCurrentDoc: (doc) => {
+    console.log('📝 Updating document in store:', {
+      id: doc?.id,
+      title: doc?.title,
+      contentLength: doc?.content?.length,
+      timestamp: new Date().toISOString()
+    });
+    set({ currentDoc: doc });
+  },
   setWordCount: (count) => set({ wordCount: count }),
   updatePerformanceMetrics: (responseTime) =>
     set((state) => ({
