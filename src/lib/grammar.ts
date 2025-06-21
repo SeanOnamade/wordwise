@@ -26,12 +26,11 @@ interface LTResponse {
   matches: LTMatch[];
 }
 
-export type Suggestion = {
+interface GrammarSuggestion {
   id: string;
   type: 'spelling' | 'grammar' | 'style';
   ruleKey: string;
   original: string;
-  replacement: string;  // Keep for UI compatibility
   replacements: string[];
   explanation: string;
   range: { from: number; to: number };
@@ -94,7 +93,7 @@ function findWordBoundaries(text: string, searchText: string, startOffset: numbe
 }
 
 // Convert LanguageTool suggestion to our format
-function convertLTSuggestion(match: LTMatch, fullText: string): Suggestion {
+function convertLTSuggestion(match: LTMatch, fullText: string): GrammarSuggestion {
   // TEMP LOG – remove after working
   console.log('🟡 RAW', match.rule.id, match);
 
@@ -117,7 +116,6 @@ function convertLTSuggestion(match: LTMatch, fullText: string): Suggestion {
     type: mapLTCategory(match.rule.category.id),
     ruleKey: match.rule.id,
     original: originalFromContext.trim(),
-    replacement: originalFromContext.trim(),
     replacements: match.replacements?.map(r => r.value) ?? [],
     explanation: match.message,
     range,
@@ -125,7 +123,7 @@ function convertLTSuggestion(match: LTMatch, fullText: string): Suggestion {
   };
 }
 
-export async function checkText(plainText: string, lang = 'en-US'): Promise<Suggestion[]> {
+export async function checkText(plainText: string, lang = 'en-US'): Promise<GrammarSuggestion[]> {
   try {
     const ltUrl = (process.env.NEXT_PUBLIC_LT_URL || 'http://localhost:8010') + '/v2/check';
     
