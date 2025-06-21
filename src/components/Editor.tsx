@@ -10,7 +10,7 @@ import { Link } from '@tiptap/extension-link';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { Superscript } from '@tiptap/extension-superscript';
 import { Subscript } from '@tiptap/extension-subscript';
-import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
+import Table from '@tiptap/extension-table';
 import { GrammarHighlight } from '@/lib/tiptap-extensions';
 import { useEditorStore } from '@/store/editorStore';
 import { useEffect, useCallback, useState, useRef } from 'react';
@@ -198,6 +198,12 @@ const Editor = () => {
         types: ['heading', 'paragraph'],
         alignments: ['left', 'center', 'right', 'justify'],
       }),
+      Table.configure({
+        resizable: true,
+        HTMLAttributes: {
+          class: 'border-collapse table-auto w-full',
+        },
+      }),
       GrammarHighlight,
       createGrammarHighlightExtension(suggestions),
     ],
@@ -306,7 +312,7 @@ const Editor = () => {
           const suggestionId = highlight.dataset.suggestionId;
           const suggestion = suggestions.find(s => s.id === suggestionId);
           
-          if (suggestion && suggestion.replacement) {
+          if (suggestion && suggestion.replacements.length > 0) {
             // Show inline actions instead of immediately applying
             setInlineActions({
               show: true,
@@ -335,7 +341,7 @@ const Editor = () => {
             
             // Show tooltip with suggestion details
             const tooltipText = `${suggestion.type.toUpperCase()}: ${suggestion.explanation}${
-              suggestion.replacement ? `\n\nSuggested: "${suggestion.replacement}"` : ''
+              suggestion.replacements[0] ? `\n\nSuggested: "${suggestion.replacements[0]}"` : ''
             }\n\nClick to see options or use the suggestions panel.`;
             
             showTooltip(highlight, tooltipText, suggestionId);
@@ -397,6 +403,7 @@ const Editor = () => {
   
   useAutosave({
     docId: currentDoc?.id || '',
+    title: currentDoc?.title || '',
     content: currentDoc?.content || '',
     enabled: !!currentDoc?.id && !!auth?.currentUser
   });
