@@ -94,22 +94,12 @@ function findWordBoundaries(text: string, searchText: string, startOffset: numbe
 
 // Convert LanguageTool suggestion to our format
 function convertLTSuggestion(match: LTMatch, fullText: string): GrammarSuggestion {
-  // TEMP LOG – remove after working
-  console.log('🟡 RAW', match.rule.id, match);
-
   // Extract the original text from the match
   const originalFromContext = fullText.substring(match.offset, match.offset + match.length);
   
   // Find exact word boundaries
   const boundaries = findWordBoundaries(fullText, originalFromContext, match.offset);
   const range = boundaries || { from: match.offset + 1, to: match.offset + match.length + 1 };
-
-  console.log('📍 Position mapping:', {
-    original: { from: match.offset, to: match.offset + match.length },
-    adjusted: range,
-    text: originalFromContext,
-    fullTextPreview: fullText.slice(Math.max(0, match.offset - 10), match.offset + match.length + 10)
-  });
 
   return {
     id: crypto.randomUUID(),

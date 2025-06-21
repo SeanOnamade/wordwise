@@ -236,7 +236,7 @@ const Editor = () => {
       
       // Run grammar check on the plain text
       if (text.trim().length >= 3) {
-        debouncedGrammarCheck(text);
+      debouncedGrammarCheck(text);
       }
     },
     editorProps: {
@@ -510,7 +510,7 @@ const Editor = () => {
     
     if (suggestion && editor) {
       const { original } = suggestion;
-      
+    
       // Simple approach: replace in the HTML content
       const currentHTML = editor.getHTML();
       const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -522,7 +522,7 @@ const Editor = () => {
         const newHTML = currentHTML.replace(regex, replacement);
         editor.commands.setContent(newHTML);
         console.log('Applied suggestion using HTML replacement:', suggestionId, `"${original}" -> "${replacement}"`);
-      } else {
+    } else {
         // Fallback: try direct text replacement without word boundaries
         const simpleRegex = new RegExp(escapedOriginal, 'i');
         if (simpleRegex.test(currentHTML)) {
@@ -531,12 +531,12 @@ const Editor = () => {
           console.log('Applied suggestion using simple replacement:', suggestionId, `"${original}" -> "${replacement}"`);
         } else {
           console.log('Could not find original text to replace in HTML:', original);
-        }
+    }
       }
       
       // Update suggestion status
       updateSuggestionStatus(suggestionId, 'applied');
-      
+    
       // Force refresh of decorations to remove highlights
       setTimeout(() => {
         const { view } = editor;

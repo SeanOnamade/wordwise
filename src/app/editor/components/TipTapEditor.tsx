@@ -6,12 +6,14 @@ import StarterKit from '@tiptap/starter-kit';
 import { Color } from '@tiptap/extension-color';
 import { Highlight } from '@tiptap/extension-highlight';
 import { Underline } from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { Suggestion, useEditorStore } from '@/store/editorStore';
 import { checkText } from '@/lib/grammar';
 import debounce from 'lodash/debounce';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 // Plugin key for suggestion highlights
 const suggestionHighlightKey = new PluginKey('suggestionHighlight');
@@ -166,29 +168,15 @@ export default function TipTapEditor({
   // Debounced grammar check
   const debouncedGrammarCheck = useRef(
     debounce(async (rawText: string) => {
-      console.log('🔄 debounce fires', { rawText: rawText.slice(0, 50) + '...', length: rawText.length });
-      
       if (rawText.length < 3 || rawText === lastCheckRef.current) return;
       lastCheckRef.current = rawText;
       
-      console.log('👀 GRAMMAR EFFECT fired', { length: rawText.length });
       try {
-        console.log('🛫 Calling LT for', rawText.slice(0, 50));
         // Clear existing suggestions
         clearSuggestions();
         
         // Get new suggestions from LanguageTool
         const suggestions = await checkText(rawText);
-        
-        console.log('📊 Received suggestions:', { 
-          count: suggestions.length,
-          suggestions: suggestions.map(s => ({
-            original: s.original,
-            replacement: s.replacements[0],
-            range: s.range,
-            type: s.type
-          }))
-        });
         
         // Add each suggestion
         suggestions.forEach(suggestion => {
@@ -200,6 +188,26 @@ export default function TipTapEditor({
     }, 800)
   ).current;
 
+  // Create keyboard shortcut extension
+  const KeyboardShortcutExtension = Extension.create({
+    name: 'customKeyboardShortcuts',
+    addKeyboardShortcuts() {
+      return {
+        'Mod-Shift-x': () => this.editor.commands.toggleStrike(),
+        'Mod-Shift-h': () => this.editor.commands.toggleHighlight(),
+        'Mod-Alt-1': () => this.editor.commands.toggleHeading({ level: 1 }),
+        'Mod-Alt-2': () => this.editor.commands.toggleHeading({ level: 2 }),
+        'Mod-Alt-3': () => this.editor.commands.toggleHeading({ level: 3 }),
+        'Mod-Shift-8': () => this.editor.commands.toggleBulletList(),
+        'Mod-Shift-7': () => this.editor.commands.toggleOrderedList(),
+        'Mod-Shift-l': () => this.editor.commands.setTextAlign('left'),
+        'Mod-Shift-e': () => this.editor.commands.setTextAlign('center'),
+        'Mod-Shift-r': () => this.editor.commands.setTextAlign('right'),
+        'Mod-Shift-j': () => this.editor.commands.setTextAlign('justify'),
+      }
+    }
+  });
+
   // Memoized extensions array to prevent unnecessary re-creation
   const extensions = useMemo(() => [
     StarterKit.configure({
@@ -207,16 +215,22 @@ export default function TipTapEditor({
       history: {
         depth: 100, // Limit undo history for better performance
         newGroupDelay: 500,
-      },
+      }
     }),
     Color,
     Highlight.configure({ 
       multicolor: true,
       HTMLAttributes: {
         class: 'custom-highlight',
-      },
+      }
     }),
     Underline,
+    TextAlign.configure({
+      types: ['heading', 'paragraph'],
+      alignments: ['left', 'center', 'right', 'justify'],
+      defaultAlignment: 'left',
+    }),
+    KeyboardShortcutExtension,
     SuggestionHighlightExtension,
   ], []); // Empty dependency array - these never change
   
@@ -230,9 +244,6 @@ export default function TipTapEditor({
     updateTimeoutRef.current = setTimeout(() => {
       const html = editor.getHTML();
       const text = editor.getText();
-      
-      // ‼️ probe
-      console.log('🎯 onUpdate', { htmlSnippet: html.slice(0,30), textLen: text.length });
       
       onUpdate?.(html);
       onTextChange?.(text);
@@ -269,10 +280,6 @@ export default function TipTapEditor({
   // Update editor content when content prop changes
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-      console.log('📝 Updating editor content:', {
-        newContent: content?.substring(0, 50) + '...',
-        oldContent: editor.getHTML()?.substring(0, 50) + '...'
-      });
       editor.commands.setContent(content);
     }
   }, [editor, content]);
@@ -382,24 +389,9 @@ export default function TipTapEditor({
     const suggestion = suggestions.find(s => s.id === suggestionId);
     if (!suggestion) return;
 
-    console.log('🔧 Applying suggestion:', { 
-      id: suggestionId, 
-      original: suggestion.original, 
-      replacement,
-      range: suggestion.range 
-    });
-
     // Get current text content
     const currentText = editor.getText();
     const { from, to } = suggestion.range;
-    
-    // Verify the text at the range matches what we expect
-    const textAtRange = currentText.slice(from, to);
-    console.log('📍 Text verification:', { 
-      expected: suggestion.original, 
-      actual: textAtRange,
-      matches: textAtRange.trim().toLowerCase() === suggestion.original.toLowerCase()
-    });
 
     // Use TipTap's transaction system for precise replacement
     const { view } = editor;
@@ -414,8 +406,6 @@ export default function TipTapEditor({
     
     // Hide tooltip
     setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
-    
-    console.log('✅ Suggestion applied successfully');
   }, [editor, suggestions, updateSuggestionStatus]);
 
   // Handle suggestion dismissal
@@ -423,6 +413,18 @@ export default function TipTapEditor({
     updateSuggestionStatus(suggestionId, 'dismissed');
     setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
   }, [updateSuggestionStatus]);
+
+  // Add keyboard shortcuts
+  const { getShortcutLabel } = useKeyboardShortcuts({
+    editor,
+    onSave: () => {
+      // Trigger content update for autosave
+      if (editor) {
+        const html = editor.getHTML();
+        onUpdate?.(html);
+      }
+    }
+  });
 
   if (!editor) {
     return (
@@ -482,131 +484,251 @@ export default function TipTapEditor({
       `}</style>
 
       {/* Fixed Toolbar inside editor card */}
-      <div className="flex gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-200 text-slate-800 shadow-inner rounded-t-xl">
-        {/* Undo */}
-        <button
-          onClick={() => editor.chain().focus().undo().run()}
-          disabled={!editor.can().undo()}
-          className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
-          title="Undo"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-          </svg>
-        </button>
+      <div className="overflow-x-auto bg-slate-100 dark:bg-slate-200 text-slate-800 shadow-inner rounded-t-xl">
+        <div className="flex gap-1 px-3 py-2 min-w-max">
+          {/* Undo */}
+          <button
+            onClick={() => editor.chain().focus().undo().run()}
+            disabled={!editor.can().undo()}
+            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
+            title={`Undo (${getShortcutLabel('undo')})`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            </svg>
+          </button>
 
-        {/* Redo */}
-        <button
-          onClick={() => editor.chain().focus().redo().run()}
-          disabled={!editor.can().redo()}
-          className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
-          title="Redo"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
-          </svg>
-        </button>
+          {/* Redo */}
+          <button
+            onClick={() => editor.chain().focus().redo().run()}
+            disabled={!editor.can().redo()}
+            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
+            title={`Redo (${getShortcutLabel('redo')})`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+            </svg>
+          </button>
 
-        {/* Bold */}
-        <button
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-1.5 rounded transition-colors ${
-            editor.isActive('bold') 
-              ? 'bg-indigo-500 text-white' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-          }`}
-          title="Bold"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 4h6a4 4 0 014 4 4 4 0 01-4 4H8V4zM8 12h7a4 4 0 014 4 4 4 0 01-4 4H8v-8z" />
-          </svg>
-        </button>
+          {/* Separator */}
+          <div className="w-px h-6 bg-slate-300 mx-1"></div>
 
-        {/* Italic */}
-        <button
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-1.5 rounded transition-colors ${
-            editor.isActive('italic') 
-              ? 'bg-indigo-500 text-white' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-          }`}
-          title="Italic"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10 4l4 16M6 20h8M8 4h8" />
-          </svg>
-        </button>
+          {/* Paragraph */}
+          <button
+            onClick={() => editor.chain().focus().setParagraph().run()}
+            className={`px-2 py-1.5 rounded transition-colors text-sm font-semibold ${
+              editor.isActive('paragraph') 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title="Paragraph"
+          >
+            P
+          </button>
 
-        {/* Underline */}
-        <button
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          className={`p-1.5 rounded transition-colors ${
-            editor.isActive('underline') 
-              ? 'bg-indigo-500 text-white' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-          }`}
-          title="Underline"
-        >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M4 16h12v1H4v-1zM6 3v6a4 4 0 008 0V3h-1v6a3 3 0 01-6 0V3H6z" />
-          </svg>
-        </button>
+          {/* H1 */}
+          <button
+            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+            className={`px-2 py-1.5 rounded transition-colors text-sm font-semibold ${
+              editor.isActive('heading', { level: 1 }) 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Heading 1 (${getShortcutLabel('h1')})`}
+          >
+            H1
+          </button>
 
-        {/* H1 */}
-        <button
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={`p-1.5 rounded transition-colors text-sm font-semibold ${
-            editor.isActive('heading', { level: 1 }) 
-              ? 'bg-indigo-500 text-white' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-          }`}
-          title="Heading 1"
-        >
-          H1
-        </button>
+          {/* H2 */}
+          <button
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            className={`px-2 py-1.5 rounded transition-colors text-sm font-semibold ${
+              editor.isActive('heading', { level: 2 }) 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Heading 2 (${getShortcutLabel('h2')})`}
+          >
+            H2
+          </button>
 
-        {/* H2 */}
-        <button
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`p-1.5 rounded transition-colors text-sm font-semibold ${
-            editor.isActive('heading', { level: 2 }) 
-              ? 'bg-indigo-500 text-white' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-          }`}
-          title="Heading 2"
-        >
-          H2
-        </button>
+          {/* H3 */}
+          <button
+            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+            className={`px-2 py-1.5 rounded transition-colors text-sm font-semibold ${
+              editor.isActive('heading', { level: 3 }) 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Heading 3 (${getShortcutLabel('h3')})`}
+          >
+            H3
+          </button>
 
-        {/* Bullet List */}
-        <button
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`p-1.5 rounded transition-colors ${
-            editor.isActive('bulletList') 
-              ? 'bg-indigo-500 text-white' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-          }`}
-          title="Bullet List"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+          {/* Separator */}
+          <div className="w-px h-6 bg-slate-300 mx-1"></div>
 
-        {/* Numbered List */}
-        <button
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={`p-1.5 rounded transition-colors ${
-            editor.isActive('orderedList') 
-              ? 'bg-indigo-500 text-white' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-          }`}
-          title="Numbered List"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
+          {/* Bold */}
+          <button
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive('bold') 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Bold (${getShortcutLabel('bold')})`}
+          >
+            <span className="font-bold text-sm">B</span>
+          </button>
+
+          {/* Italic */}
+          <button
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive('italic') 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Italic (${getShortcutLabel('italic')})`}
+          >
+            <span className="italic text-sm">I</span>
+          </button>
+
+          {/* Underline */}
+          <button
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive('underline') 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Underline (${getShortcutLabel('underline')})`}
+          >
+            <span className="underline text-sm">U</span>
+          </button>
+
+          {/* Strikethrough */}
+          <button
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive('strike') 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Strikethrough (${getShortcutLabel('strike')})`}
+          >
+            <span className="line-through text-sm">S</span>
+          </button>
+
+          {/* Highlight */}
+          <button
+            onClick={() => editor.chain().focus().toggleHighlight().run()}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive('highlight') 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Highlight (${getShortcutLabel('highlight')})`}
+          >
+            <span className="bg-yellow-200 px-1 rounded text-xs">H</span>
+          </button>
+
+          {/* Separator */}
+          <div className="w-px h-6 bg-slate-300 mx-1"></div>
+
+          {/* Align Left */}
+          <button
+            onClick={() => editor.chain().focus().setTextAlign('left').run()}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive({ textAlign: 'left' }) 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Align Left (${getShortcutLabel('alignLeft')})`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h10M4 12h10M4 18h10" />
+            </svg>
+          </button>
+
+          {/* Align Center */}
+          <button
+            onClick={() => editor.chain().focus().setTextAlign('center').run()}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive({ textAlign: 'center' }) 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Align Center (${getShortcutLabel('alignCenter')})`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 6h10M4 12h16M7 18h10" />
+            </svg>
+          </button>
+
+          {/* Align Right */}
+          <button
+            onClick={() => editor.chain().focus().setTextAlign('right').run()}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive({ textAlign: 'right' }) 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Align Right (${getShortcutLabel('alignRight')})`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6h10M4 12h16M10 18h10" />
+            </svg>
+          </button>
+
+          {/* Justify */}
+          <button
+            onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive({ textAlign: 'justify' }) 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Justify (${getShortcutLabel('alignJustify')})`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
+          {/* Separator */}
+          <div className="w-px h-6 bg-slate-300 mx-1"></div>
+
+          {/* Bullet List */}
+          <button
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive('bulletList') 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Bullet List (${getShortcutLabel('bulletList')})`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
+          {/* Numbered List */}
+          <button
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive('orderedList') 
+                ? 'bg-indigo-500 text-white' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+            }`}
+            title={`Numbered List (${getShortcutLabel('orderedList')})`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Floating Bubble Menu */}
@@ -623,7 +745,7 @@ export default function TipTapEditor({
               ? 'bg-indigo-500 text-white' 
               : 'text-slate-200 hover:text-white'
           }`}
-          title="Bold"
+          title={`Bold (${getShortcutLabel('bold')})`}
         >
           B
         </button>
@@ -636,7 +758,7 @@ export default function TipTapEditor({
               ? 'bg-indigo-500 text-white' 
               : 'text-slate-200 hover:text-white'
           }`}
-          title="Italic"
+          title={`Italic (${getShortcutLabel('italic')})`}
         >
           I
         </button>
@@ -649,9 +771,35 @@ export default function TipTapEditor({
               ? 'bg-indigo-500 text-white' 
               : 'text-slate-200 hover:text-white'
           }`}
-          title="Underline"
+          title={`Underline (${getShortcutLabel('underline')})`}
         >
           U
+        </button>
+
+        {/* Strikethrough */}
+        <button
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+          className={`px-3 py-1 text-sm line-through rounded-lg transition-colors hover:bg-slate-700/50 ${
+            editor.isActive('strike') 
+              ? 'bg-indigo-500 text-white' 
+              : 'text-slate-200 hover:text-white'
+          }`}
+          title={`Strikethrough (${getShortcutLabel('strike')})`}
+        >
+          S
+        </button>
+
+        {/* Highlight */}
+        <button
+          onClick={() => editor.chain().focus().toggleHighlight().run()}
+          className={`px-3 py-1 text-sm rounded-lg transition-colors hover:bg-slate-700/50 ${
+            editor.isActive('highlight') 
+              ? 'bg-indigo-500 text-white' 
+              : 'text-slate-200 hover:text-white'
+          }`}
+          title={`Highlight (${getShortcutLabel('highlight')})`}
+        >
+          <span className="bg-yellow-200 text-slate-800 px-1 rounded text-xs">H</span>
         </button>
 
         {/* H1 */}
@@ -662,7 +810,7 @@ export default function TipTapEditor({
               ? 'bg-indigo-500 text-white' 
               : 'text-slate-200 hover:text-white'
           }`}
-          title="Heading 1"
+          title={`Heading 1 (${getShortcutLabel('h1')})`}
         >
           H1
         </button>
@@ -675,35 +823,22 @@ export default function TipTapEditor({
               ? 'bg-indigo-500 text-white' 
               : 'text-slate-200 hover:text-white'
           }`}
-          title="Heading 2"
+          title={`Heading 2 (${getShortcutLabel('h2')})`}
         >
           H2
         </button>
 
-        {/* Bullet List */}
+        {/* H3 */}
         <button
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`px-3 py-1 text-sm rounded-lg transition-colors hover:bg-slate-700/50 ${
-            editor.isActive('bulletList') 
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          className={`px-3 py-1 text-sm font-semibold rounded-lg transition-colors hover:bg-slate-700/50 ${
+            editor.isActive('heading', { level: 3 }) 
               ? 'bg-indigo-500 text-white' 
               : 'text-slate-200 hover:text-white'
           }`}
-          title="Bullet List"
+          title={`Heading 3 (${getShortcutLabel('h3')})`}
         >
-          •
-        </button>
-
-        {/* Numbered List */}
-        <button
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={`px-3 py-1 text-sm rounded-lg transition-colors hover:bg-slate-700/50 ${
-            editor.isActive('orderedList') 
-              ? 'bg-indigo-500 text-white' 
-              : 'text-slate-200 hover:text-white'
-          }`}
-          title="Numbered List"
-        >
-          1.
+          H3
         </button>
       </BubbleMenu>
 
