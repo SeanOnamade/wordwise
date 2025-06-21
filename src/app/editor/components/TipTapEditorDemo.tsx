@@ -2,35 +2,42 @@
 
 import { useState } from 'react';
 import TipTapEditor from './TipTapEditor';
+import { Suggestion } from '@/lib/grammar';
 
 // Mock suggestions for testing
-const mockSuggestions = [
+const mockSuggestions: Suggestion[] = [
   {
     id: '1',
     original: 'teh',
     replacement: 'the',
+    replacements: ['the'],
     type: 'grammar',
     range: { from: 0, to: 3 },
-    status: 'pending',
-    explanation: 'Spelling correction'
+    status: 'new',
+    explanation: 'Spelling correction',
+    ruleKey: 'MORFOLOGIK_RULE_EN_US'
   },
   {
     id: '2', 
     original: 'realy',
     replacement: 'really',
-    type: 'fluency',
+    replacements: ['really', 'real', 'relay'],
+    type: 'spelling',
     range: { from: 10, to: 15 },
-    status: 'pending',
-    explanation: 'Improve fluency'
+    status: 'new',
+    explanation: 'Spelling mistake found',
+    ruleKey: 'MORFOLOGIK_RULE_EN_US'
   },
   {
     id: '3',
     original: 'amazing',
     replacement: 'excellent',
-    type: 'tone',
+    replacements: ['excellent', 'remarkable', 'outstanding'],
+    type: 'style',
     range: { from: 20, to: 27 },
-    status: 'pending', 
-    explanation: 'Better tone for academic writing'
+    status: 'new', 
+    explanation: 'Consider using a more formal word in academic writing',
+    ruleKey: 'ACADEMIC_WORD_SUGGESTION'
   }
 ];
 
@@ -42,7 +49,7 @@ export default function TipTapEditorDemo() {
     setSuggestions(prev => 
       prev.map(s => 
         s.id === suggestionId 
-          ? { ...s, status: 'accepted' }
+          ? { ...s, status: 'applied' }
           : s
       )
     );
@@ -52,7 +59,7 @@ export default function TipTapEditorDemo() {
     setSuggestions(prev => 
       prev.map(s => 
         s.id === suggestionId 
-          ? { ...s, status: 'rejected' }
+          ? { ...s, status: 'dismissed' }
           : s
       )
     );
@@ -75,11 +82,11 @@ export default function TipTapEditorDemo() {
         {/* Suggestions Panel */}
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">Suggestions</h2>
-          {suggestions.filter(s => s.status === 'pending').map(suggestion => (
+          {suggestions.filter(s => s.status === 'new').map(suggestion => (
             <div key={suggestion.id} className="p-4 border rounded-lg bg-white shadow">
               <div className={`inline-block px-2 py-1 rounded text-xs mb-2 ${
                 suggestion.type === 'grammar' ? 'bg-red-100 text-red-800' :
-                suggestion.type === 'fluency' ? 'bg-blue-100 text-blue-800' :
+                suggestion.type === 'spelling' ? 'bg-blue-100 text-blue-800' :
                 'bg-green-100 text-green-800'
               }`}>
                 {suggestion.type}
@@ -112,7 +119,7 @@ export default function TipTapEditorDemo() {
             </div>
           ))}
           
-          {suggestions.filter(s => s.status === 'pending').length === 0 && (
+          {suggestions.filter(s => s.status === 'new').length === 0 && (
             <p className="text-gray-500 text-center py-8">No pending suggestions</p>
           )}
         </div>
@@ -122,7 +129,7 @@ export default function TipTapEditorDemo() {
       <div className="mt-8 p-4 bg-gray-100 rounded">
         <h3 className="font-semibold mb-2">Debug Info:</h3>
         <p><strong>Content:</strong> {content}</p>
-        <p><strong>Pending Suggestions:</strong> {suggestions.filter(s => s.status === 'pending').length}</p>
+        <p><strong>Pending Suggestions:</strong> {suggestions.filter(s => s.status === 'new').length}</p>
       </div>
     </div>
   );
