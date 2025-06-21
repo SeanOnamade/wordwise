@@ -3,7 +3,17 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { getFirestore, setLogLevel } from 'firebase/firestore';
-import { getPerformance, trace } from 'firebase/performance';
+
+// Only import Performance in production
+const isProduction = process.env.NEXT_PUBLIC_ENV === 'prod';
+let getPerformance: any;
+let trace: any;
+
+if (typeof window !== 'undefined' && isProduction) {
+  const performanceModule = require('firebase/performance');
+  getPerformance = performanceModule.getPerformance;
+  trace = performanceModule.trace;
+}
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -24,15 +34,23 @@ if (typeof window !== 'undefined') {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
   db = getFirestore(app);
-  perf = getPerformance(app);
   
-  // Enable Firestore debug logging
-  setLogLevel('debug');
+  // Only initialize Performance in production
+  if (isProduction) {
+    perf = getPerformance(app);
+  } else {
+    console.log('🚫 Firebase Performance SDK disabled in development');
+  }
+  
+  // Enable Firestore debug logging in development
+  if (!isProduction) {
+    setLogLevel('debug');
+  }
 }
 
 // Enhanced performance monitoring helper
 export const createPerformanceTrace = (traceName: string) => {
-  if (perf && typeof window !== 'undefined') {
+  if (perf && typeof window !== 'undefined' && isProduction) {
     try {
       const traceInstance = trace(perf, traceName);
       
@@ -53,85 +71,82 @@ export const createPerformanceTrace = (traceName: string) => {
 export const performanceMonitor = {
   // Grammar check performance
   grammarCheck: (startTime: number, endTime: number, wordCount: number, suggestionCount: number) => {
-    const trace = createPerformanceTrace('grammar_check_performance');
-    if (trace) {
-      trace.putAttribute('word_count', wordCount.toString());
-      trace.putAttribute('suggestion_count', suggestionCount.toString());
-      trace.putAttribute('duration_ms', (endTime - startTime).toString());
-      trace.start();
-      setTimeout(() => trace.stop(), 0); // Stop immediately to record the duration
+    const traceInstance = createPerformanceTrace('grammar_check_performance');
+    if (traceInstance) {
+      traceInstance.putAttribute('word_count', wordCount.toString());
+      traceInstance.putAttribute('suggestion_count', suggestionCount.toString());
+      traceInstance.putAttribute('duration_ms', (endTime - startTime).toString());
+      traceInstance.start();
+      setTimeout(() => traceInstance.stop(), 0); // Stop immediately to record the duration
     }
   },
 
   // Document save performance
   documentSave: (startTime: number, endTime: number, docSize: number) => {
-    const trace = createPerformanceTrace('document_save_performance');
-    if (trace) {
-      trace.putAttribute('document_size_chars', docSize.toString());
-      trace.putAttribute('duration_ms', (endTime - startTime).toString());
-      trace.start();
-      setTimeout(() => trace.stop(), 0);
+    const traceInstance = createPerformanceTrace('document_save_performance');
+    if (traceInstance) {
+      traceInstance.putAttribute('document_size_chars', docSize.toString());
+      traceInstance.putAttribute('duration_ms', (endTime - startTime).toString());
+      traceInstance.start();
+      setTimeout(() => traceInstance.stop(), 0);
     }
   },
 
   // Export performance
   documentExport: (startTime: number, endTime: number, format: string, docSize: number) => {
-    const trace = createPerformanceTrace('document_export_performance');
-    if (trace) {
-      trace.putAttribute('export_format', format);
-      trace.putAttribute('document_size_chars', docSize.toString());
-      trace.putAttribute('duration_ms', (endTime - startTime).toString());
-      trace.start();
-      setTimeout(() => trace.stop(), 0);
+    const traceInstance = createPerformanceTrace('document_export_performance');
+    if (traceInstance) {
+      traceInstance.putAttribute('export_format', format);
+      traceInstance.putAttribute('document_size_chars', docSize.toString());
+      traceInstance.putAttribute('duration_ms', (endTime - startTime).toString());
+      traceInstance.start();
+      setTimeout(() => traceInstance.stop(), 0);
     }
   },
 
   // Editor performance
   editorPerformance: (action: string, duration: number, contextData?: Record<string, string>) => {
-    const trace = createPerformanceTrace(`editor_${action}`);
-    if (trace) {
-      trace.putAttribute('action', action);
-      trace.putAttribute('duration_ms', duration.toString());
+    const traceInstance = createPerformanceTrace(`editor_${action}`);
+    if (traceInstance) {
+      traceInstance.putAttribute('action', action);
+      traceInstance.putAttribute('duration_ms', duration.toString());
       
       // Add any additional context data
       if (contextData) {
         Object.entries(contextData).forEach(([key, value]) => {
-          trace.putAttribute(key, value);
+          traceInstance.putAttribute(key, value);
         });
       }
       
-      trace.start();
-      setTimeout(() => trace.stop(), 0);
+      traceInstance.start();
+      setTimeout(() => traceInstance.stop(), 0);
     }
   },
 
   // Authentication performance
   authPerformance: (action: string, startTime: number, endTime: number, success: boolean) => {
-    const trace = createPerformanceTrace(`auth_${action}`);
-    if (trace) {
-      trace.putAttribute('auth_action', action);
-      trace.putAttribute('success', success.toString());
-      trace.putAttribute('duration_ms', (endTime - startTime).toString());
-      trace.start();
-      setTimeout(() => trace.stop(), 0);
+    const traceInstance = createPerformanceTrace(`auth_${action}`);
+    if (traceInstance) {
+      traceInstance.putAttribute('auth_action', action);
+      traceInstance.putAttribute('success', success.toString());
+      traceInstance.putAttribute('duration_ms', (endTime - startTime).toString());
+      traceInstance.start();
+      setTimeout(() => traceInstance.stop(), 0);
     }
   }
 };
 
-// Error tracking integration with Sentry
+// Track errors for monitoring
 export const trackError = (error: Error, context?: Record<string, any>) => {
-  console.error('Error tracked:', error, context);
-  
-  // If Sentry is available, use it for error tracking
-  if (typeof window !== 'undefined' && (window as any).Sentry) {
-    (window as any).Sentry.captureException(error, {
-      extra: context,
-      tags: {
-        component: 'firebase',
-        environment: process.env.NODE_ENV
-      }
-    });
-  }
+  console.error('Application error:', {
+    error: {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    },
+    context,
+    timestamp: new Date().toISOString()
+  });
 };
 
 export const sendSignInLink = async (email: string) => {
@@ -166,4 +181,4 @@ export const confirmSignIn = async (email: string) => {
   return { success: false, error: 'Invalid sign-in link' };
 };
 
-export { app, auth, db }; 
+export { app, auth, db, perf }; 

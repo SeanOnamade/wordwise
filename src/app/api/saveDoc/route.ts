@@ -4,11 +4,11 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(request: Request) {
   try {
-    const { userId, docId, title, content } = await request.json();
+    const { userId, docId, title, content = '' } = await request.json();
 
-    if (!userId || !docId || !title || !content) {
+    if (!userId || !docId || !title) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: userId, docId, and title are required' },
         { status: 400 }
       );
     }
@@ -125,6 +125,64 @@ export async function GET(request: Request) {
     console.error('Error loading documents:', error);
     return NextResponse.json(
       { error: 'Failed to load documents' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    const docId = searchParams.get('docId');
+
+    if (!userId || !docId) {
+      return NextResponse.json(
+        { error: 'Missing required fields: userId and docId' },
+        { status: 400 }
+      );
+    }
+
+    // Check if Firebase is configured
+    if (!adminDb) {
+      console.info('📝 Development mode: Document deletion skipped (no Firebase credentials)');
+      return NextResponse.json({ 
+        success: true,
+        message: 'Document deleted successfully (development mode)',
+        note: 'Configure Firebase credentials for persistent storage'
+      });
+    }
+
+    // Check if document exists and user owns it
+    const docRef = adminDb.collection('documents').doc(docId);
+    const docSnapshot = await docRef.get();
+    
+    if (!docSnapshot.exists) {
+      return NextResponse.json(
+        { error: 'Document not found' },
+        { status: 404 }
+      );
+    }
+
+    const docData = docSnapshot.data();
+    if (docData?.ownerUid !== userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      );
+    }
+
+    // Delete the document
+    await docRef.delete();
+
+    return NextResponse.json({ 
+      success: true,
+      message: 'Document deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete document' },
       { status: 500 }
     );
   }

@@ -179,6 +179,17 @@ export default function TipTapEditor({
     shouldRerenderOnTransaction: false, // Prevent unnecessary re-renders
   });
 
+  // Update editor content when content prop changes
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      console.log('📝 Updating editor content:', {
+        newContent: content?.substring(0, 50) + '...',
+        oldContent: editor.getHTML()?.substring(0, 50) + '...'
+      });
+      editor.commands.setContent(content);
+    }
+  }, [editor, content]);
+
   // Notify parent when editor is created
   useEffect(() => {
     if (editor && onEditorCreate) {

@@ -12,6 +12,14 @@ interface Suggestion {
   status: 'pending' | 'accepted' | 'rejected';
 }
 
+interface Document {
+  id: string;
+  title: string;
+  content: string;
+  lastModified?: Date;
+  createdAt?: Date;
+}
+
 interface EditorState {
   editor: Editor | null;
   suggestions: Suggestion[];
@@ -20,15 +28,16 @@ interface EditorState {
     totalChecks: number;
     lastResponseTime: number;
   };
-  currentDoc: {
-    id: string;
-    title: string;
-    content: string;
-  } | null;
+  currentDoc: Document | null;
+  documents: Document[];
   setEditor: (editor: Editor | null) => void;
   addSuggestion: (suggestion: Omit<Suggestion, 'id' | 'status'>) => void;
   updateSuggestionStatus: (id: string, status: 'accepted' | 'rejected') => void;
-  setCurrentDoc: (doc: { id: string; title: string; content: string } | null) => void;
+  setCurrentDoc: (doc: Document | null) => void;
+  setDocuments: (docs: Document[]) => void;
+  addDocument: (doc: Document) => void;
+  updateDocument: (doc: Document) => void;
+  removeDocument: (docId: string) => void;
   setWordCount: (count: number) => void;
   updatePerformanceMetrics: (responseTime: number) => void;
   clearSuggestions: () => void;
@@ -43,6 +52,7 @@ export const useEditorStore = create<EditorState>((set) => ({
     lastResponseTime: 0,
   },
   currentDoc: null,
+  documents: [],
   setEditor: (editor) => set({ editor }),
   addSuggestion: (suggestion) =>
     set((state) => ({
@@ -66,6 +76,24 @@ export const useEditorStore = create<EditorState>((set) => ({
     });
     set({ currentDoc: doc });
   },
+  setDocuments: (docs) => set({ documents: docs }),
+  addDocument: (doc) => 
+    set((state) => ({
+      documents: [doc, ...state.documents],
+      currentDoc: doc // Automatically set as current doc
+    })),
+  updateDocument: (doc) =>
+    set((state) => ({
+      documents: state.documents.map((d) =>
+        d.id === doc.id ? { ...d, ...doc } : d
+      ),
+      currentDoc: state.currentDoc?.id === doc.id ? doc : state.currentDoc
+    })),
+  removeDocument: (docId) =>
+    set((state) => ({
+      documents: state.documents.filter((d) => d.id !== docId),
+      currentDoc: state.currentDoc?.id === docId ? null : state.currentDoc
+    })),
   setWordCount: (count) => set({ wordCount: count }),
   updatePerformanceMetrics: (responseTime) =>
     set((state) => ({

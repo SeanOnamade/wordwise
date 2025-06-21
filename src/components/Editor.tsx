@@ -190,38 +190,8 @@ const Editor = () => {
         setCurrentDoc({
           ...currentDoc,
           content,
+          lastModified: new Date()
         });
-        
-        // Manual autosave
-        if (auth?.currentUser) {
-          console.log('💾 Triggering manual save to API');
-          const saveTimeout = setTimeout(async () => {
-            try {
-              const response = await fetch('/api/saveDoc', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  userId: auth.currentUser?.uid,
-                  docId: currentDoc.id,
-                  content,
-                  lastModified: new Date().toISOString()
-                }),
-              });
-
-              if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-              }
-              console.log('✅ Manual save successful');
-            } catch (error) {
-              console.error('❌ Manual save failed:', error);
-            }
-          }, 2000);
-
-          // Cleanup timeout on component unmount
-          return () => clearTimeout(saveTimeout);
-        }
       } else {
         console.warn('⚠️ No current document to update');
       }
@@ -489,66 +459,6 @@ const Editor = () => {
     content: currentDoc?.content || '',
     enabled: !!currentDoc?.id && !!auth?.currentUser
   });
-
-  // Load user documents on mount
-  useEffect(() => {
-    const loadUserDocuments = async () => {
-      console.log('🔄 Checking document load conditions:', {
-        isClient: typeof window !== 'undefined',
-        isAuthenticated: !!auth?.currentUser,
-        hasCurrentDoc: !!currentDoc
-      });
-
-      if (typeof window === 'undefined' || !auth?.currentUser || currentDoc) {
-        console.log('⏭️ Skipping document load');
-        return;
-      }
-      
-      try {
-        console.log('📥 Loading documents for user:', auth.currentUser?.uid);
-        const response = await fetch(`/api/saveDoc?userId=${auth.currentUser?.uid}`);
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('📄 Documents loaded:', {
-            count: data.documents?.length || 0
-          });
-          
-          if (data.documents && data.documents.length > 0) {
-            // Load the most recent document
-            const mostRecent = data.documents[0];
-            console.log('📝 Loading most recent document:', {
-              id: mostRecent.id,
-              title: mostRecent.title,
-              contentLength: mostRecent.content?.length
-            });
-            
-            setCurrentDoc({
-              id: mostRecent.id,
-              title: mostRecent.title,
-              content: mostRecent.content
-            });
-            return;
-          }
-        } else {
-          console.error('❌ Failed to load documents:', response.status);
-        }
-      } catch (error) {
-        console.error('❌ Failed to load user documents:', error);
-      }
-      
-      // Create new document if no existing documents or failed to load
-      console.log('📄 Creating new document');
-      const newDoc = {
-        id: crypto.randomUUID(),
-        title: 'Untitled Document',
-        content: '',
-      };
-      setCurrentDoc(newDoc);
-    };
-
-    loadUserDocuments();
-  }, [currentDoc, setCurrentDoc]);
 
   const saveDocument = async () => {
     if (!currentDoc || !tiptapEditor || typeof window === 'undefined' || !auth?.currentUser) return;
