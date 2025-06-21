@@ -47,9 +47,13 @@ const createDecorations = (doc: any, suggestions: Suggestion[]): DecorationSet =
   // Batch decoration creation for better performance
   pendingSuggestions.forEach(suggestion => {
     const { range, type, id } = suggestion;
-    const { from, to } = range;
+    let { from, to } = range;
     
-    // Validate range bounds
+    // Ensure range is within document bounds
+    from = Math.max(0, from);
+    to = Math.min(doc.content.size, to);
+    
+    // Validate range bounds and ensure it's not empty
     if (from >= 0 && to <= doc.content.size && from < to) {
       decorations.push(
         Decoration.inline(from, to, {
@@ -60,7 +64,12 @@ const createDecorations = (doc: any, suggestions: Suggestion[]): DecorationSet =
             background-color: ${getHighlightColor(type)};
             border-bottom: 2px dotted ${getHighlightBorder(type)};
             border-radius: 2px;
-            padding: 1px 2px;
+            padding: 0px 1px;
+            margin: 0px;
+            box-decoration-break: clone;
+            -webkit-box-decoration-break: clone;
+            display: inline;
+            line-height: inherit;
             transition: all 0.2s ease;
           `.replace(/\s+/g, ' ').trim()
         })
@@ -157,7 +166,7 @@ export default function TipTapEditor({
   // Debounced grammar check
   const debouncedGrammarCheck = useRef(
     debounce(async (rawText: string) => {
-      console.log('🔄 debounce fires', { rawText });
+      console.log('🔄 debounce fires', { rawText: rawText.slice(0, 50) + '...', length: rawText.length });
       
       if (rawText.length < 3 || rawText === lastCheckRef.current) return;
       lastCheckRef.current = rawText;
@@ -170,6 +179,16 @@ export default function TipTapEditor({
         
         // Get new suggestions from LanguageTool
         const suggestions = await checkText(rawText);
+        
+        console.log('📊 Received suggestions:', { 
+          count: suggestions.length,
+          suggestions: suggestions.map(s => ({
+            original: s.original,
+            replacement: s.replacements[0],
+            range: s.range,
+            type: s.type
+          }))
+        });
         
         // Add each suggestion
         suggestions.forEach(suggestion => {
@@ -363,21 +382,40 @@ export default function TipTapEditor({
     const suggestion = suggestions.find(s => s.id === suggestionId);
     if (!suggestion) return;
 
-    // Replace text in editor
-    const currentHTML = editor.getHTML();
-    const escapedOriginal = suggestion.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'i');
+    console.log('🔧 Applying suggestion:', { 
+      id: suggestionId, 
+      original: suggestion.original, 
+      replacement,
+      range: suggestion.range 
+    });
+
+    // Get current text content
+    const currentText = editor.getText();
+    const { from, to } = suggestion.range;
     
-    if (regex.test(currentHTML)) {
-      const newHTML = currentHTML.replace(regex, replacement);
-      editor.commands.setContent(newHTML);
-    }
+    // Verify the text at the range matches what we expect
+    const textAtRange = currentText.slice(from, to);
+    console.log('📍 Text verification:', { 
+      expected: suggestion.original, 
+      actual: textAtRange,
+      matches: textAtRange.trim().toLowerCase() === suggestion.original.toLowerCase()
+    });
+
+    // Use TipTap's transaction system for precise replacement
+    const { view } = editor;
+    const { state } = view;
+    
+    // Create a transaction to replace the text
+    const tr = state.tr.replaceWith(from, to, state.schema.text(replacement));
+    view.dispatch(tr);
 
     // Update suggestion status
     updateSuggestionStatus(suggestionId, 'applied');
     
     // Hide tooltip
     setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
+    
+    console.log('✅ Suggestion applied successfully');
   }, [editor, suggestions, updateSuggestionStatus]);
 
   // Handle suggestion dismissal
@@ -402,18 +440,44 @@ export default function TipTapEditor({
   return (
     <div className="bg-slate-50 text-slate-900 rounded-2xl editor-light-canvas relative overflow-hidden">
       <style jsx>{`
+        .suggestion-highlight {
+          position: relative;
+          z-index: 1;
+        }
         .suggestion-highlight:hover {
-          background-color: rgba(59, 130, 246, 0.3) !important;
-          transform: scale(1.02);
+          background-color: rgba(59, 130, 246, 0.4) !important;
+          transform: none;
+          z-index: 2;
+        }
+        .hl-grammar {
+          background-color: rgba(239, 68, 68, 0.2) !important;
+          border-bottom-color: #ef4444 !important;
         }
         .hl-grammar:hover {
-          background-color: rgba(239, 68, 68, 0.3) !important;
+          background-color: rgba(239, 68, 68, 0.35) !important;
+        }
+        .hl-style {
+          background-color: rgba(245, 158, 11, 0.2) !important;
+          border-bottom-color: #f59e0b !important;
         }
         .hl-style:hover {
-          background-color: rgba(245, 158, 11, 0.3) !important;
+          background-color: rgba(245, 158, 11, 0.35) !important;
+        }
+        .hl-spelling {
+          background-color: rgba(59, 130, 246, 0.2) !important;
+          border-bottom-color: #3b82f6 !important;
         }
         .hl-spelling:hover {
-          background-color: rgba(59, 130, 246, 0.3) !important;
+          background-color: rgba(59, 130, 246, 0.35) !important;
+        }
+        /* Ensure proper text flow */
+        .editor-content p {
+          line-height: 1.6;
+          margin: 0.5em 0;
+        }
+        .editor-content {
+          word-wrap: break-word;
+          overflow-wrap: break-word;
         }
       `}</style>
 

@@ -3,11 +3,6 @@ interface Position {
   end: number;
 }
 
-interface TipTapToPlainTextMap {
-  text: string;
-  positions: Position[];
-}
-
 interface LTMatch {
   message: string;
   shortMessage: string;
@@ -42,55 +37,6 @@ interface GrammarSuggestion {
   status: 'new' | 'applied' | 'dismissed';
 }
 
-// Convert TipTap JSON to plain text while maintaining position mapping
-function convertTipTapToPlainText(html: string): TipTapToPlainTextMap {
-  // Create a temporary div to parse HTML
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  
-  const positions: Position[] = [];
-  let plainText = '';
-  let htmlIndex = 0;
-
-  // Recursive function to process nodes
-  function processNode(node: Node) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent || '';
-      const start = plainText.length;
-      plainText += text;
-      positions.push({ start, end: plainText.length });
-      htmlIndex += text.length;
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      // Skip certain elements
-      if ((node as Element).tagName === 'SCRIPT' || (node as Element).tagName === 'STYLE') {
-        return;
-      }
-      
-      // Process child nodes
-      node.childNodes.forEach(processNode);
-      
-      // Add space after block elements
-      if (window.getComputedStyle(node as Element).display === 'block') {
-        plainText += '\n';
-        htmlIndex++;
-      }
-    }
-  }
-
-  processNode(div);
-  return { text: plainText, positions };
-}
-
-// Map plain text position back to TipTap position
-function mapPlainTextToTipTap(plainTextPos: number, positions: Position[]): number {
-  for (const pos of positions) {
-    if (plainTextPos >= pos.start && plainTextPos <= pos.end) {
-      return pos.start + (plainTextPos - pos.start);
-    }
-  }
-  return plainTextPos;
-}
-
 // Helper to map LanguageTool categories to our types
 function mapLTCategory(categoryId: string): 'spelling' | 'grammar' | 'style' {
   if (categoryId.toLowerCase().includes('spell')) return 'spelling';
@@ -98,33 +44,91 @@ function mapLTCategory(categoryId: string): 'spelling' | 'grammar' | 'style' {
   return 'grammar';
 }
 
+// Find exact word boundaries in text and adjust for TipTap document structure
+function findWordBoundaries(text: string, searchText: string, startOffset: number): { from: number; to: number } | null {
+  // Clean the search text
+  const cleanSearchText = searchText.trim();
+  if (!cleanSearchText) return null;
+  
+  // Find the word starting from the offset
+  const contextStart = Math.max(0, startOffset - 50);
+  const contextEnd = Math.min(text.length, startOffset + cleanSearchText.length + 50);
+  const context = text.substring(contextStart, contextEnd);
+  
+  // Create a regex to find the exact word
+  const escapedText = cleanSearchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const wordRegex = new RegExp(`\\b${escapedText}\\b`, 'gi');
+  
+  let match;
+  while ((match = wordRegex.exec(context)) !== null) {
+    const absoluteStart = contextStart + match.index;
+    const absoluteEnd = absoluteStart + match[0].length;
+    
+    // Check if this match is close to our expected offset
+    if (Math.abs(absoluteStart - startOffset) <= 5) {
+      // Adjust positions for TipTap document structure
+      // TipTap adds 1 position for the opening paragraph node
+      const adjustedFrom = absoluteStart + 1;
+      const adjustedTo = absoluteEnd + 1;
+      
+      return {
+        from: adjustedFrom,
+        to: adjustedTo
+      };
+    }
+  }
+  
+  // Fallback: use the original offset but trim whitespace and adjust for document structure
+  const originalText = text.substring(startOffset, startOffset + cleanSearchText.length);
+  const trimStart = originalText.search(/\S/);
+  const trimEnd = originalText.search(/\s*$/);
+  
+  const fallbackFrom = startOffset + (trimStart >= 0 ? trimStart : 0) + 1;
+  const fallbackTo = startOffset + (trimEnd >= 0 ? trimEnd : cleanSearchText.length) + 1;
+  
+  return {
+    from: fallbackFrom,
+    to: fallbackTo
+  };
+}
+
 // Convert LanguageTool suggestion to our format
-function convertLTSuggestion(match: LTMatch, positions: Position[]): GrammarSuggestion {
+function convertLTSuggestion(match: LTMatch, fullText: string): GrammarSuggestion {
   // TEMP LOG – remove after working
   console.log('🟡 RAW', match.rule.id, match);
 
-  const start = match.offset;
-  const end = start + match.length;
-  const original = match.context?.text.slice(start, end) || '';
+  // Extract the original text from the match
+  const originalFromContext = fullText.substring(match.offset, match.offset + match.length);
+  
+  // Find exact word boundaries
+  const boundaries = findWordBoundaries(fullText, originalFromContext, match.offset);
+  const range = boundaries || { from: match.offset + 1, to: match.offset + match.length + 1 };
+
+  console.log('📍 Position mapping:', {
+    original: { from: match.offset, to: match.offset + match.length },
+    adjusted: range,
+    text: originalFromContext,
+    fullTextPreview: fullText.slice(Math.max(0, match.offset - 10), match.offset + match.length + 10)
+  });
 
   return {
     id: crypto.randomUUID(),
     type: mapLTCategory(match.rule.category.id),
     ruleKey: match.rule.id,
-    original,
+    original: originalFromContext.trim(),
     replacements: match.replacements?.map(r => r.value) ?? [],
     explanation: match.message,
-    range: { from: start, to: end },
+    range,
     status: 'new'
   };
 }
 
-export async function checkText(content: string, lang = 'en-US'): Promise<GrammarSuggestion[]> {
+export async function checkText(plainText: string, lang = 'en-US'): Promise<GrammarSuggestion[]> {
   try {
     const ltUrl = (process.env.NEXT_PUBLIC_LT_URL || 'http://localhost:8010') + '/v2/check';
     
-    // Convert TipTap HTML to plain text while maintaining position mapping
-    const { text, positions } = convertTipTapToPlainText(content);
+    // Use the plain text directly - no HTML conversion needed
+    console.log('📝 Checking text:', { length: plainText.length, preview: plainText.slice(0, 100) });
     
     // Call LanguageTool API
     const response = await fetch(ltUrl, {
@@ -133,7 +137,7 @@ export async function checkText(content: string, lang = 'en-US'): Promise<Gramma
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        text: text,
+        text: plainText,
         language: lang,
         enabledOnly: 'false',
         level: 'picky',
@@ -151,7 +155,7 @@ export async function checkText(content: string, lang = 'en-US'): Promise<Gramma
     console.log('🟡 RAW matches', data.matches.length, data.matches);
     
     // Convert LanguageTool suggestions to our format
-    return data.matches.map(match => convertLTSuggestion(match, positions));
+    return data.matches.map(match => convertLTSuggestion(match, plainText));
   } catch (error) {
     console.error('Grammar check failed:', error);
     return [];
