@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const LANGUAGE_TOOL_URL = 'http://localhost:8010/v2/check';
+const LANGUAGE_TOOL_URL = (process.env.NEXT_PUBLIC_LT_URL || 'http://localhost:8010') + '/v2/check';
 
 // Helper function to preserve case when making replacements
 const preserveCase = (original: string, replacement: string): string => {
@@ -444,14 +444,16 @@ export async function POST(request: Request) {
     const startTime = Date.now();
     console.log('🔍 Starting grammar suggestion generation...');
     try {
-      const response = await fetch(`http://localhost:8010/v2/check`, {
+      const response = await fetch(LANGUAGE_TOOL_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          language: 'en-US',
           text,
-          disabledRules: '',        // keep default
-        }),
+          language: 'en-US',
+          enabledOnly: 'false',
+          level: 'picky',
+          disabledRules: 'WHITESPACE_RULE'  // Ignore HTML whitespace
+        }).toString(),
         signal: AbortSignal.timeout(1800), // 1.8s timeout to ensure <2000ms total
       });
 

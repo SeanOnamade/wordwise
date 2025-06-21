@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useEditorStore } from '@/store/editorStore';
+import { useEditorStore, Suggestion } from '@/store/editorStore';
 import SuggestionCard from './SuggestionCard';
 import { Badge } from '@/components/ui/badge';
 
@@ -12,7 +12,18 @@ interface SuggestionDrawerProps {
 export default function SuggestionDrawer({ editor }: SuggestionDrawerProps) {
   const { suggestions, updateSuggestionStatus } = useEditorStore();
   
-  const pendingSuggestions = suggestions.filter(s => s.status === 'pending');
+  // Log suggestions before filtering
+  console.log('🔍 PRE-FILTER', suggestions);
+
+  // Filter and sort suggestions
+  const visible = suggestions
+    .filter(s => s.status === 'new')
+    .sort((a, b) =>
+      a.ruleKey.localeCompare(b.ruleKey) ||
+      a.range.from - b.range.from);
+
+  // TEMP LOG – remove after working
+  console.log('🔵 PIPELINE', visible.length, visible);
 
   const handleApplySuggestion = (suggestionId: string, replacement: string) => {
     const suggestion = suggestions.find(s => s.id === suggestionId);
@@ -44,7 +55,7 @@ export default function SuggestionDrawer({ editor }: SuggestionDrawerProps) {
       }
       
       // Update suggestion status
-      updateSuggestionStatus(suggestionId, 'accepted');
+      updateSuggestionStatus(suggestionId, 'applied');
       
       // Force refresh of decorations to remove highlights
       setTimeout(() => {
@@ -59,7 +70,7 @@ export default function SuggestionDrawer({ editor }: SuggestionDrawerProps) {
   };
 
   const handleDismissSuggestion = (suggestionId: string) => {
-    updateSuggestionStatus(suggestionId, 'rejected');
+    updateSuggestionStatus(suggestionId, 'dismissed');
     
     // Force refresh of decorations to remove highlights
     if (editor) {
@@ -81,9 +92,9 @@ export default function SuggestionDrawer({ editor }: SuggestionDrawerProps) {
             <h3 className="text-sm font-semibold text-slate-100">
               Writing Suggestions
             </h3>
-            {pendingSuggestions.length > 0 && (
+            {visible.length > 0 && (
               <Badge variant="secondary" className="text-xs bg-indigo-500 text-white">
-                {pendingSuggestions.length}
+                {visible.length}
               </Badge>
             )}
           </div>
@@ -93,7 +104,7 @@ export default function SuggestionDrawer({ editor }: SuggestionDrawerProps) {
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4">
-          {pendingSuggestions.length === 0 ? (
+          {visible.length === 0 ? (
             /* Empty State */
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
@@ -121,7 +132,7 @@ export default function SuggestionDrawer({ editor }: SuggestionDrawerProps) {
           ) : (
             /* Suggestions List */
             <div className="space-y-4">
-              {pendingSuggestions.map((suggestion) => (
+              {visible.map((suggestion) => (
                 <SuggestionCard
                   key={suggestion.id}
                   suggestion={suggestion}

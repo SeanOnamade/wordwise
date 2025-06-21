@@ -13,7 +13,7 @@ import { Subscript } from '@tiptap/extension-subscript';
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
 import { GrammarHighlight } from '@/lib/tiptap-extensions';
 import { useEditorStore } from '@/store/editorStore';
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { useAutosave } from '@/hooks/useAutosave';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
@@ -23,6 +23,8 @@ import KeyboardShortcuts from './KeyboardShortcuts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Toggle } from '@/components/ui/toggle';
+import { checkText } from '@/lib/grammar';
+import debounce from 'lodash/debounce';
 // import { db } from '@/lib/firebase'; // Temporarily disabled
 
 // Create plugin key for grammar highlights
@@ -94,7 +96,7 @@ const createDecorations = (doc: any, suggestions: any[]) => {
 };
 
 const Editor = () => {
-  const { editor, setEditor, suggestions, addSuggestion, clearSuggestions, currentDoc, setCurrentDoc } = useEditorStore();
+  const { editor, setEditor, suggestions, addSuggestion, clearSuggestions, currentDoc, setCurrentDoc, updateDocument, wordCount, setWordCount, updateSuggestionStatus } = useEditorStore();
   
   // Core Functionality Tracking
   const [performanceMetrics, setPerformanceMetrics] = useState({
@@ -110,7 +112,6 @@ const Editor = () => {
     console.log('Suggestions state updated:', suggestions);
   }, [suggestions]);
   const [isLoading, setIsLoading] = useState(false);
-  const [wordCount, setWordCount] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [grammarSource, setGrammarSource] = useState<'languagetool' | 'mock' | null>(null);
   const [tooltip, setTooltip] = useState<{ show: boolean; text: string; element: HTMLElement | null; suggestionId?: string }>({
@@ -124,7 +125,41 @@ const Editor = () => {
     element: null,
     suggestionId: '',
   });
+  const lastCheckRef = useRef<string>('');
 
+  // Debounced grammar check - wrapped in useRef to maintain reference
+  const debouncedGrammarCheck = useRef(
+    debounce(async (rawText: string) => {
+      console.log('🔄 debounce fires', { rawText });
+      
+      if (rawText.length < 3 || rawText === lastCheckRef.current) return;
+      lastCheckRef.current = rawText;
+      
+      console.log('👀 GRAMMAR EFFECT fired', { length: rawText.length });
+      setIsLoading(true);
+      try {
+        console.log('🛫 Calling LT for', rawText.slice(0, 50));
+        // Clear existing suggestions
+        clearSuggestions();
+        
+        // Get new suggestions from LanguageTool
+        const suggestions = await checkText(rawText);
+        
+        // Add each suggestion
+        suggestions.forEach(suggestion => {
+          addSuggestion(suggestion);
+        });
+        
+        setGrammarSource('languagetool');
+      } catch (error) {
+        console.error('Grammar check failed:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 800)
+  ).current;
+
+  // Create editor with performance optimizations
   const tiptapEditor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -172,6 +207,9 @@ const Editor = () => {
       const content = editor.getHTML();
       const text = editor.getText();
       
+      // ‼️ probe
+      console.log('🎯 onUpdate', { htmlSnippet: content.slice(0,30), textLen: text.length });
+      
       console.log('✍️ Editor update triggered');
       
       // Update word count
@@ -196,8 +234,10 @@ const Editor = () => {
         console.warn('⚠️ No current document to update');
       }
       
-      // Debounced grammar check
-      debouncedGrammarCheck(text);
+      // Run grammar check on the plain text
+      if (text.trim().length >= 3) {
+        debouncedGrammarCheck(text);
+      }
     },
     editorProps: {
       attributes: {
@@ -238,105 +278,6 @@ const Editor = () => {
     
     return longSentences;
   }, []);
-
-  // Enhanced grammar checking with 40-word rule
-  const debouncedGrammarCheck = useCallback(
-    debounce(async (text: string) => {
-      if (text.length < 3) return; // Don't check very short text
-      
-      const startTime = Date.now();
-      console.log('Grammar checking text:', text); // Debug log
-      setIsLoading(true);
-      
-      // Start Firebase performance trace
-      const performanceTrace = createPerformanceTrace('generate_suggestion');
-      performanceTrace?.start();
-      
-      try {
-        // Check for 40-word rule violations first
-        const longSentences = checkSentenceLength(text);
-        
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ text }),
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          const responseTime = Date.now() - startTime;
-          
-          // Track performance metrics
-          setPerformanceMetrics(prev => {
-            const newTotalChecks = prev.totalChecks + 1;
-            const newAverageTime = ((prev.averageResponseTime * prev.totalChecks) + responseTime) / newTotalChecks;
-            
-            return {
-              ...prev,
-              lastResponseTime: responseTime,
-              averageResponseTime: newAverageTime,
-              totalChecks: newTotalChecks
-            };
-          });
-          
-          console.log(`📊 Performance: ${responseTime}ms response time`);
-          console.log('Grammar check response:', data); // Debug log
-          console.log('Number of suggestions received:', data.suggestions?.length || 0); // Debug log
-          
-          clearSuggestions();
-          clearAllHighlights();
-          
-          // Add 40-word rule suggestions first
-          longSentences.forEach((longSentence, index) => {
-            const suggestion = {
-              range: { from: longSentence.start, to: longSentence.end },
-              type: 'style' as const,
-              original: longSentence.sentence.substring(0, 50) + (longSentence.sentence.length > 50 ? '...' : ''),
-              replacement: '',
-              ruleKey: 'LONG_SENTENCE',
-              explanation: `📏 Long sentence detected: ${longSentence.wordCount} words. Academic writing is more effective with sentences under 40 words. Consider breaking this into shorter, clearer sentences for better readability.`
-            };
-            addSuggestion(suggestion);
-          });
-          
-          // Add suggestions from grammar checker
-          data.suggestions.forEach((suggestion: any, index: number) => {
-            console.log('Adding suggestion:', suggestion); // Debug log
-            const suggestionWithId = {
-              ...suggestion,
-              id: crypto.randomUUID()
-            };
-            addSuggestion(suggestionWithId);
-            
-            console.log('🚀 Suggestion added, decorations will be applied automatically:', suggestionWithId.original);
-          });
-          
-          setGrammarSource(data.source || 'mock');
-          
-          // Performance alert if too slow
-          if (responseTime > 2000) {
-            console.warn('⚠️ Response time exceeded 2 seconds:', responseTime + 'ms');
-          }
-          
-          // Debug: Check final suggestions state
-          setTimeout(() => {
-            console.log('Current suggestions in store:', useEditorStore.getState().suggestions);
-          }, 100);
-        }
-      } catch (error) {
-        console.error('Grammar check failed:', error);
-        const responseTime = Date.now() - startTime;
-        console.error('Failed after:', responseTime + 'ms');
-      } finally {
-        // Stop Firebase performance trace
-        performanceTrace?.stop();
-        setIsLoading(false);
-      }
-    }, 1000), // 1-second debounce for responsive typing
-    [addSuggestion, clearSuggestions, checkSentenceLength]
-  );
 
   // Update decorations when suggestions change
   useEffect(() => {
@@ -564,75 +505,63 @@ const Editor = () => {
   };
 
   // Enhanced apply suggestion with undo support
-  const applySuggestion = (suggestionId: string, replacement: string) => {
-    if (!tiptapEditor) return;
-    
+  const handleApplySuggestion = (suggestionId: string, replacement: string) => {
     const suggestion = suggestions.find(s => s.id === suggestionId);
-    if (!suggestion) return;
     
-    // Track accuracy when user accepts suggestion
-    setPerformanceMetrics(prev => ({
-      ...prev,
-      suggestionAccuracy: prev.suggestionAccuracy + 1
-    }));
-    
-    // Store current state for undo functionality
-    const currentContent = tiptapEditor.getHTML();
-    
-    // Get current HTML and text content
-    const currentText = tiptapEditor.getText();
-    
-    // Use the range to get the specific text to replace
-    const { from, to } = suggestion.range;
-    const textAtPosition = currentText.slice(from, to);
-    
-    // If the text at the position matches the suggestion, create a more specific replacement
-    if (textAtPosition.toLowerCase() === suggestion.original.toLowerCase()) {
-      // Create a unique marker for this specific instance
-      const beforeText = currentText.slice(0, from);
-      const afterText = currentText.slice(to);
+    if (suggestion && editor) {
+      const { original } = suggestion;
       
-      // Count how many times the original text appears before this position
-      const beforeMatches = (beforeText.match(new RegExp(escapeRegExp(suggestion.original), 'gi')) || []).length;
+      // Simple approach: replace in the HTML content
+      const currentHTML = editor.getHTML();
+      const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       
-      // Replace the specific occurrence (beforeMatches + 1)
-      let replacementCount = 0;
-      const updatedHTML = currentContent.replace(
-        new RegExp(escapeRegExp(suggestion.original), 'gi'),
-        (match) => {
-          replacementCount++;
-          return replacementCount === beforeMatches + 1 ? replacement : match;
+      // Create a regex that matches the original text
+      const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'i');
+      
+      if (regex.test(currentHTML)) {
+        const newHTML = currentHTML.replace(regex, replacement);
+        editor.commands.setContent(newHTML);
+        console.log('Applied suggestion using HTML replacement:', suggestionId, `"${original}" -> "${replacement}"`);
+      } else {
+        // Fallback: try direct text replacement without word boundaries
+        const simpleRegex = new RegExp(escapedOriginal, 'i');
+        if (simpleRegex.test(currentHTML)) {
+          const newHTML = currentHTML.replace(simpleRegex, replacement);
+          editor.commands.setContent(newHTML);
+          console.log('Applied suggestion using simple replacement:', suggestionId, `"${original}" -> "${replacement}"`);
+        } else {
+          console.log('Could not find original text to replace in HTML:', original);
         }
-      );
+      }
       
-      // Apply the change with undo support
-      tiptapEditor.chain().focus().setContent(updatedHTML).run();
+      // Update suggestion status
+      updateSuggestionStatus(suggestionId, 'applied');
+      
+      // Force refresh of decorations to remove highlights
+      setTimeout(() => {
+        const { view } = editor;
+        const tr = view.state.tr;
+        tr.setMeta('suggestionsChanged', true);
+        view.dispatch(tr);
+      }, 100);
     } else {
-      // Fallback: replace first occurrence
-      console.warn('Range mismatch, using fallback replacement');
-      const updatedHTML = currentContent.replace(
-        new RegExp(escapeRegExp(suggestion.original), 'i'), 
-        replacement
-      );
-      tiptapEditor.chain().focus().setContent(updatedHTML).run();
+      console.log('Cannot apply suggestion: editor not ready or suggestion not found');
     }
-    
-    useEditorStore.getState().updateSuggestionStatus(suggestionId, 'accepted');
-    
-    // Hide inline actions and tooltip
-    setInlineActions({ show: false, element: null, suggestionId: '' });
-    hideTooltip();
-    
-    // Remove the highlight for this suggestion
-    removeHighlight(suggestionId);
   };
 
   // Enhanced reject suggestion function
-  const rejectSuggestion = (suggestionId: string) => {
-    useEditorStore.getState().updateSuggestionStatus(suggestionId, 'rejected');
-    setInlineActions({ show: false, element: null, suggestionId: '' });
-    hideTooltip();
-    removeHighlight(suggestionId);
+  const handleDismissSuggestion = (suggestionId: string) => {
+    updateSuggestionStatus(suggestionId, 'dismissed');
+    
+    // Force refresh of decorations to remove highlights
+    if (editor) {
+      setTimeout(() => {
+        const { view } = editor;
+        const tr = view.state.tr;
+        tr.setMeta('suggestionsChanged', true);
+        view.dispatch(tr);
+      }, 100);
+    }
   };
 
   // Helper function to escape special regex characters
@@ -708,13 +637,13 @@ const Editor = () => {
                     ⚡ {performanceMetrics.lastResponseTime}ms
                   </Badge>
                 )}
-                {suggestions.length > 0 && (
+                {suggestions.filter(s => s.status === 'new').length > 0 && (
                   <Badge 
-                    variant="outline"
-                    className="text-xs font-medium border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-700 dark:bg-purple-900/50 dark:text-purple-200"
-                    aria-label={`${suggestions.filter(s => s.status === 'pending').length} active grammar suggestions`}
+                    variant="destructive"
+                    className="text-xs font-medium"
+                    aria-label={`${suggestions.filter(s => s.status === 'new').length} pending suggestions`}
                   >
-                    🎯 {suggestions.filter(s => s.status === 'pending').length} active
+                    {suggestions.filter(s => s.status === 'new').length}
                   </Badge>
                 )}
               </div>
@@ -1046,11 +975,11 @@ const Editor = () => {
                         transform: 'translateX(-50%)',
                       }}
                     >
-                      {suggestion?.replacement && (
+                      {suggestion?.replacements[0] && (
                         <button
-                          onClick={() => applySuggestion(inlineActions.suggestionId, suggestion.replacement)}
+                          onClick={() => handleApplySuggestion(inlineActions.suggestionId, suggestion.replacements[0])}
                           className="px-3 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 transition-colors flex items-center space-x-1"
-                          title={`Apply: "${suggestion.replacement}"`}
+                          title={`Apply: "${suggestion.replacements[0]}"`}
                         >
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -1059,7 +988,7 @@ const Editor = () => {
                         </button>
                       )}
                       <button
-                        onClick={() => rejectSuggestion(inlineActions.suggestionId)}
+                        onClick={() => handleDismissSuggestion(inlineActions.suggestionId)}
                         className="px-3 py-1 bg-gray-600 text-white rounded text-xs font-medium hover:bg-gray-700 transition-colors flex items-center space-x-1"
                         title="Dismiss this suggestion"
                       >
@@ -1092,13 +1021,13 @@ const Editor = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
                 Smart Suggestions
-                {suggestions.filter(s => s.status === 'pending').length > 0 && (
+                {suggestions.filter(s => s.status === 'new').length > 0 && (
                   <Badge 
                     variant="destructive"
                     className="ml-auto text-xs font-medium"
-                    aria-label={`${suggestions.filter(s => s.status === 'pending').length} pending suggestions`}
+                    aria-label={`${suggestions.filter(s => s.status === 'new').length} pending suggestions`}
                   >
-                    {suggestions.filter(s => s.status === 'pending').length}
+                    {suggestions.filter(s => s.status === 'new').length}
                   </Badge>
                 )}
               </h2>
@@ -1109,7 +1038,7 @@ const Editor = () => {
                 </div>
               )}
               
-              {suggestions.filter(s => s.status === 'pending').length === 0 ? (
+              {suggestions.filter(s => s.status === 'new').length === 0 ? (
                 <div className="text-center py-12">
                   <div className="bg-gradient-to-br from-green-100 to-emerald-100 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
                     <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1121,7 +1050,7 @@ const Editor = () => {
                 </div>
               ) : (
                 <div className="space-y-4 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
-                  {suggestions.filter(s => s.status === 'pending').map((suggestion) => (
+                  {suggestions.filter(s => s.status === 'new').map((suggestion) => (
                     <div
                       key={suggestion.id}
                       className="group p-5 bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900 border border-slate-200/50 dark:border-slate-700/50 rounded-xl hover:shadow-lg hover:border-blue-200 dark:hover:border-blue-600 transition-all duration-300 hover:-translate-y-1"
@@ -1140,9 +1069,9 @@ const Editor = () => {
                         <p className="font-semibold text-red-700 mb-2 bg-red-50 px-3 py-1 rounded-lg border border-red-200">
                           "{suggestion.original}"
                         </p>
-                        {suggestion.replacement && (
+                        {suggestion.replacements[0] && (
                           <p className="font-semibold text-green-700 mb-3 bg-green-50 px-3 py-1 rounded-lg border border-green-200">
-                            → "{suggestion.replacement}"
+                            → "{suggestion.replacements[0]}"
                           </p>
                         )}
                         <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors duration-300">
@@ -1151,16 +1080,16 @@ const Editor = () => {
                       </div>
                       
                       <div className="flex space-x-2">
-                        {suggestion.replacement && (
+                        {suggestion.replacements[0] && (
                           <button
-                            onClick={() => applySuggestion(suggestion.id, suggestion.replacement)}
+                            onClick={() => handleApplySuggestion(suggestion.id, suggestion.replacements[0])}
                             className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 text-sm font-medium transition-all duration-200 hover:scale-105 hover:shadow-md"
                           >
                             ✓ Apply Fix
                           </button>
                         )}
                         <button
-                          onClick={() => rejectSuggestion(suggestion.id)}
+                          onClick={() => handleDismissSuggestion(suggestion.id)}
                           className="px-4 py-2 bg-gradient-to-r from-slate-500 to-slate-600 text-white rounded-lg hover:from-slate-600 hover:to-slate-700 text-sm font-medium transition-all duration-200 hover:scale-105"
                         >
                           ✕ Dismiss
@@ -1177,17 +1106,5 @@ const Editor = () => {
     </div>
   );
 };
-
-// Debounce utility function
-function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-}
 
 export default Editor; 

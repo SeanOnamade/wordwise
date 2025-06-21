@@ -2,15 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-
-interface Suggestion {
-  id: string;
-  type: 'grammar' | 'style' | 'spelling';
-  original: string;
-  replacement?: string;
-  explanation: string;
-  status?: 'pending' | 'accepted' | 'rejected';
-}
+import { Suggestion } from '@/store/editorStore';
 
 interface SuggestionCardProps {
   suggestion: Suggestion;
@@ -20,26 +12,13 @@ interface SuggestionCardProps {
 
 export default function SuggestionCard({ suggestion, onApply, onDismiss }: SuggestionCardProps) {
   const handleApply = () => {
-    if (suggestion.replacement) {
-      onApply(suggestion.id, suggestion.replacement);
+    if (suggestion.replacements[0]) {
+      onApply(suggestion.id, suggestion.replacements[0]);
     }
   };
 
   const handleDismiss = () => {
     onDismiss(suggestion.id);
-  };
-
-  const getBadgeVariant = (type: string) => {
-    switch (type) {
-      case 'grammar':
-        return 'destructive';
-      case 'style':
-        return 'secondary';
-      case 'spelling':
-        return 'default';
-      default:
-        return 'secondary';
-    }
   };
 
   const getBadgeColor = (type: string) => {
@@ -62,6 +41,7 @@ export default function SuggestionCard({ suggestion, onApply, onDismiss }: Sugge
         <Badge 
           variant="secondary"
           className={`text-xs font-medium px-2 py-1 rounded-full ${getBadgeColor(suggestion.type)}`}
+          title={suggestion.explanation}
         >
           {suggestion.type}
         </Badge>
@@ -78,11 +58,11 @@ export default function SuggestionCard({ suggestion, onApply, onDismiss }: Sugge
         </div>
 
         {/* Replacement text */}
-        {suggestion.replacement && (
+        {suggestion.replacements[0] && (
           <div className="flex items-start space-x-2">
             <span className="text-xs text-green-400 font-medium mt-0.5">+</span>
             <p className="text-sm text-green-300 bg-green-500/10 px-2 py-1 rounded flex-1 backdrop-blur-sm">
-              {suggestion.replacement}
+              {suggestion.replacements[0]}
             </p>
           </div>
         )}
@@ -95,11 +75,12 @@ export default function SuggestionCard({ suggestion, onApply, onDismiss }: Sugge
 
       {/* Action Buttons */}
       <div className="flex space-x-2">
-        {suggestion.replacement && (
+        {suggestion.replacements[0] && (
           <Button
             size="sm"
             onClick={handleApply}
             className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1.5 backdrop-blur-sm"
+            title={`Apply suggestion: "${suggestion.replacements[0]}"`}
           >
             Apply
           </Button>
@@ -109,6 +90,7 @@ export default function SuggestionCard({ suggestion, onApply, onDismiss }: Sugge
           variant="outline"
           onClick={handleDismiss}
           className="flex-1 text-xs py-1.5 border-white/20 text-slate-200 hover:bg-white/10 hover:text-white backdrop-blur-sm"
+          title="Dismiss this suggestion"
         >
           Dismiss
         </Button>

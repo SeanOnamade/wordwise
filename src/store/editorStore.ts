@@ -1,16 +1,16 @@
 import { create } from 'zustand';
 import { Editor } from '@tiptap/react';
 
-interface Suggestion {
+export type Suggestion = {
   id: string;
-  range: { from: number; to: number };
-  type: 'grammar' | 'style' | 'spelling';
-  original: string;
-  replacement: string;
+  type: 'spelling' | 'grammar' | 'style';
   ruleKey: string;
+  original: string;
+  replacements: string[];
   explanation: string;
-  status: 'pending' | 'accepted' | 'rejected';
-}
+  range: { from: number; to: number };
+  status: 'new' | 'applied' | 'dismissed';
+};
 
 interface Document {
   id: string;
@@ -31,8 +31,8 @@ interface EditorState {
   currentDoc: Document | null;
   documents: Document[];
   setEditor: (editor: Editor | null) => void;
-  addSuggestion: (suggestion: Omit<Suggestion, 'id' | 'status'>) => void;
-  updateSuggestionStatus: (id: string, status: 'accepted' | 'rejected') => void;
+  addSuggestion: (suggestion: Suggestion) => void;
+  updateSuggestionStatus: (id: string, status: 'applied' | 'dismissed') => void;
   setCurrentDoc: (doc: Document | null) => void;
   setDocuments: (docs: Document[]) => void;
   addDocument: (doc: Document) => void;
@@ -54,14 +54,17 @@ export const useEditorStore = create<EditorState>((set) => ({
   currentDoc: null,
   documents: [],
   setEditor: (editor) => set({ editor }),
-  addSuggestion: (suggestion) =>
+  addSuggestion: (sug) => {
+    // TEMP LOG – remove after working
+    console.log('🟢 ADD', sug.ruleKey, sug.range, sug.status);
     set((state) => ({
       suggestions: [
         ...state.suggestions,
-        { ...suggestion, id: crypto.randomUUID(), status: 'pending' },
+        { ...sug, status: sug.status || 'new' },
       ],
-    })),
-  updateSuggestionStatus: (id, status) =>
+    }));
+  },
+  updateSuggestionStatus: (id, status: 'applied' | 'dismissed') =>
     set((state) => ({
       suggestions: state.suggestions.map((s) =>
         s.id === id ? { ...s, status } : s

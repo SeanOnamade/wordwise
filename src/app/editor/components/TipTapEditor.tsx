@@ -6,21 +6,43 @@ import StarterKit from '@tiptap/starter-kit';
 import { Color } from '@tiptap/extension-color';
 import { Highlight } from '@tiptap/extension-highlight';
 import { Underline } from '@tiptap/extension-underline';
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { Suggestion, useEditorStore } from '@/store/editorStore';
+import { checkText } from '@/lib/grammar';
+import debounce from 'lodash/debounce';
 
 // Plugin key for suggestion highlights
 const suggestionHighlightKey = new PluginKey('suggestionHighlight');
 
+// Performance-optimized highlight colors
+const getHighlightColor = (type: string): string => {
+  const colors = {
+    grammar: 'rgba(239, 68, 68, 0.2)', // red-500 with 20% opacity
+    style: 'rgba(245, 158, 11, 0.2)',  // amber-500 with 20% opacity
+    spelling: 'rgba(59, 130, 246, 0.2)' // blue-500 with 20% opacity
+  };
+  return colors[type as keyof typeof colors] || colors.grammar;
+};
+
+const getHighlightBorder = (type: string): string => {
+  const colors = {
+    grammar: '#ef4444', // red-500
+    style: '#f59e0b',   // amber-500
+    spelling: '#3b82f6' // blue-500
+  };
+  return colors[type as keyof typeof colors] || colors.grammar;
+};
+
 // Memoized decoration creation with performance optimizations
-const createDecorations = (doc: any, suggestions: any[]): DecorationSet => {
+const createDecorations = (doc: any, suggestions: Suggestion[]): DecorationSet => {
   if (!doc || !suggestions?.length) {
     return DecorationSet.empty;
   }
   
   const decorations: Decoration[] = [];
-  const pendingSuggestions = suggestions.filter(s => s.status === 'pending');
+  const pendingSuggestions = suggestions.filter(s => s.status === 'new');
   
   // Batch decoration creation for better performance
   pendingSuggestions.forEach(suggestion => {
@@ -31,10 +53,16 @@ const createDecorations = (doc: any, suggestions: any[]): DecorationSet => {
     if (from >= 0 && to <= doc.content.size && from < to) {
       decorations.push(
         Decoration.inline(from, to, {
-          class: `hl-${type} suggestion-highlight`,
+          class: `hl-${type} suggestion-highlight cursor-pointer`,
           'data-suggestion-id': id,
           'data-suggestion-type': type,
-          style: `background-color: ${getHighlightColor(type)};`
+          style: `
+            background-color: ${getHighlightColor(type)};
+            border-bottom: 2px dotted ${getHighlightBorder(type)};
+            border-radius: 2px;
+            padding: 1px 2px;
+            transition: all 0.2s ease;
+          `.replace(/\s+/g, ' ').trim()
         })
       );
     }
@@ -43,19 +71,9 @@ const createDecorations = (doc: any, suggestions: any[]): DecorationSet => {
   return DecorationSet.create(doc, decorations);
 };
 
-// Performance-optimized highlight colors
-const getHighlightColor = (type: string): string => {
-  const colors = {
-    grammar: 'rgba(239, 68, 68, 0.15)', // red-500 with 15% opacity
-    style: 'rgba(245, 158, 11, 0.15)',  // amber-500 with 15% opacity
-    spelling: 'rgba(59, 130, 246, 0.15)' // blue-500 with 15% opacity
-  };
-  return colors[type as keyof typeof colors] || colors.grammar;
-};
-
 // Create optimized suggestion highlight plugin
 const createSuggestionHighlightPlugin = () => {
-  let currentSuggestions: any[] = [];
+  let currentSuggestions: Suggestion[] = [];
   
   return new Plugin({
     key: suggestionHighlightKey,
@@ -104,7 +122,7 @@ const SuggestionHighlightExtension = Extension.create({
 
 interface TipTapEditorProps {
   content?: string;
-  suggestions: any[];
+  suggestions: Suggestion[];
   onUpdate?: (content: string) => void;
   onTextChange?: (text: string) => void;
   onEditorCreate?: (editor: any) => void;
@@ -119,8 +137,50 @@ export default function TipTapEditor({
 }: TipTapEditorProps) {
   
   const updateTimeoutRef = useRef<NodeJS.Timeout>();
-  const lastSuggestionsRef = useRef<any[]>([]);
-  
+  const lastSuggestionsRef = useRef<Suggestion[]>([]);
+  const lastCheckRef = useRef<string>('');
+  const { addSuggestion, clearSuggestions, updateSuggestionStatus } = useEditorStore();
+
+  // Tooltip state
+  const [tooltip, setTooltip] = useState<{
+    show: boolean;
+    suggestion: Suggestion | null;
+    position: { x: number; y: number };
+    element: HTMLElement | null;
+  }>({
+    show: false,
+    suggestion: null,
+    position: { x: 0, y: 0 },
+    element: null
+  });
+
+  // Debounced grammar check
+  const debouncedGrammarCheck = useRef(
+    debounce(async (rawText: string) => {
+      console.log('🔄 debounce fires', { rawText });
+      
+      if (rawText.length < 3 || rawText === lastCheckRef.current) return;
+      lastCheckRef.current = rawText;
+      
+      console.log('👀 GRAMMAR EFFECT fired', { length: rawText.length });
+      try {
+        console.log('🛫 Calling LT for', rawText.slice(0, 50));
+        // Clear existing suggestions
+        clearSuggestions();
+        
+        // Get new suggestions from LanguageTool
+        const suggestions = await checkText(rawText);
+        
+        // Add each suggestion
+        suggestions.forEach(suggestion => {
+          addSuggestion(suggestion);
+        });
+      } catch (error) {
+        console.error('Grammar check failed:', error);
+      }
+    }, 800)
+  ).current;
+
   // Memoized extensions array to prevent unnecessary re-creation
   const extensions = useMemo(() => [
     StarterKit.configure({
@@ -152,10 +212,18 @@ export default function TipTapEditor({
       const html = editor.getHTML();
       const text = editor.getText();
       
+      // ‼️ probe
+      console.log('🎯 onUpdate', { htmlSnippet: html.slice(0,30), textLen: text.length });
+      
       onUpdate?.(html);
       onTextChange?.(text);
+      
+      // Run grammar check on the plain text
+      if (text.trim().length >= 3) {
+        debouncedGrammarCheck(text);
+      }
     }, 100); // 100ms debounce for content updates
-  }, [onUpdate, onTextChange]);
+  }, [onUpdate, onTextChange, debouncedGrammarCheck]);
   
   // Create editor with performance optimizations
   const editor = useEditor({
@@ -197,23 +265,86 @@ export default function TipTapEditor({
     }
   }, [editor, onEditorCreate]);
 
+  // Show tooltip on hover
+  const showTooltip = useCallback((element: HTMLElement, suggestion: Suggestion) => {
+    const rect = element.getBoundingClientRect();
+    const position = {
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10
+    };
+    
+    setTooltip({
+      show: true,
+      suggestion,
+      position,
+      element
+    });
+  }, []);
+
+  // Hide tooltip
+  const hideTooltip = useCallback(() => {
+    setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
+  }, []);
+
+  // Add event listeners for suggestion interactions
+  useEffect(() => {
+    if (!editor) return;
+
+    const editorElement = editor.view.dom;
+
+    // Handle hover on suggestion highlights
+    const handleHighlightHover = (event: Event) => {
+      const target = event.target as HTMLElement;
+      const highlight = target.closest('[data-suggestion-id]') as HTMLElement;
+      
+      if (highlight && highlight.dataset.suggestionId) {
+        const suggestionId = highlight.dataset.suggestionId;
+        const suggestion = suggestions.find(s => s.id === suggestionId);
+        
+        if (suggestion) {
+          showTooltip(highlight, suggestion);
+        }
+      }
+    };
+
+    // Handle mouse leave
+    const handleHighlightLeave = (event: Event) => {
+      const target = event.target as HTMLElement;
+      const highlight = target.closest('[data-suggestion-id]') as HTMLElement;
+      
+      if (highlight) {
+        // Small delay to allow moving to tooltip
+        setTimeout(() => {
+          const tooltipHovered = document.querySelector('.suggestion-tooltip:hover');
+          if (!tooltipHovered) {
+            hideTooltip();
+          }
+        }, 100);
+      }
+    };
+
+    editorElement.addEventListener('mouseenter', handleHighlightHover, true);
+    editorElement.addEventListener('mouseleave', handleHighlightLeave, true);
+
+    return () => {
+      editorElement.removeEventListener('mouseenter', handleHighlightHover, true);
+      editorElement.removeEventListener('mouseleave', handleHighlightLeave, true);
+    };
+  }, [editor, suggestions, showTooltip, hideTooltip]);
+
   // Optimized suggestions update with deep comparison
   useEffect(() => {
     if (!editor) return;
     
-    // Deep comparison to avoid unnecessary updates
-    const suggestionsChanged = JSON.stringify(suggestions) !== JSON.stringify(lastSuggestionsRef.current);
+    // Update decorations when suggestions change
+    const { view } = editor;
+    const tr = view.state.tr;
+    tr.setMeta('suggestions', suggestions);
+    tr.setMeta('forceUpdate', true);
+    view.dispatch(tr);
     
-    if (suggestionsChanged) {
-      lastSuggestionsRef.current = suggestions;
-      
-      // Update decorations efficiently
-      const { view } = editor;
-      const tr = view.state.tr;
-      tr.setMeta('suggestions', suggestions);
-      tr.setMeta('forceUpdate', true);
-      view.dispatch(tr);
-    }
+    // Update lastSuggestionsRef
+    lastSuggestionsRef.current = suggestions;
   }, [editor, suggestions]);
   
   // Cleanup on unmount
@@ -224,6 +355,36 @@ export default function TipTapEditor({
       }
     };
   }, []);
+
+  // Handle suggestion application
+  const handleApplySuggestion = useCallback((suggestionId: string, replacement: string) => {
+    if (!editor) return;
+    
+    const suggestion = suggestions.find(s => s.id === suggestionId);
+    if (!suggestion) return;
+
+    // Replace text in editor
+    const currentHTML = editor.getHTML();
+    const escapedOriginal = suggestion.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'i');
+    
+    if (regex.test(currentHTML)) {
+      const newHTML = currentHTML.replace(regex, replacement);
+      editor.commands.setContent(newHTML);
+    }
+
+    // Update suggestion status
+    updateSuggestionStatus(suggestionId, 'applied');
+    
+    // Hide tooltip
+    setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
+  }, [editor, suggestions, updateSuggestionStatus]);
+
+  // Handle suggestion dismissal
+  const handleDismissSuggestion = useCallback((suggestionId: string) => {
+    updateSuggestionStatus(suggestionId, 'dismissed');
+    setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
+  }, [updateSuggestionStatus]);
 
   if (!editor) {
     return (
@@ -240,6 +401,22 @@ export default function TipTapEditor({
 
   return (
     <div className="bg-slate-50 text-slate-900 rounded-2xl editor-light-canvas relative overflow-hidden">
+      <style jsx>{`
+        .suggestion-highlight:hover {
+          background-color: rgba(59, 130, 246, 0.3) !important;
+          transform: scale(1.02);
+        }
+        .hl-grammar:hover {
+          background-color: rgba(239, 68, 68, 0.3) !important;
+        }
+        .hl-style:hover {
+          background-color: rgba(245, 158, 11, 0.3) !important;
+        }
+        .hl-spelling:hover {
+          background-color: rgba(59, 130, 246, 0.3) !important;
+        }
+      `}</style>
+
       {/* Fixed Toolbar inside editor card */}
       <div className="flex gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-200 text-slate-800 shadow-inner rounded-t-xl">
         {/* Undo */}
@@ -472,6 +649,67 @@ export default function TipTapEditor({
           className="prose prose-lg max-w-none focus:outline-none min-h-[400px] p-6 bg-slate-50 text-slate-900"
         />
       </div>
+
+      {/* Suggestion Tooltip */}
+      {tooltip.show && tooltip.suggestion && (
+        <div
+          className="suggestion-tooltip fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-3 max-w-sm"
+          style={{
+            left: `${tooltip.position.x}px`,
+            top: `${tooltip.position.y}px`,
+            transform: 'translateX(-50%) translateY(-100%)',
+          }}
+          onMouseEnter={() => {/* Keep tooltip open on hover */}}
+          onMouseLeave={hideTooltip}
+        >
+          {/* Suggestion Type Badge */}
+          <div className="flex items-center justify-between mb-2">
+            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+              tooltip.suggestion.type === 'grammar' ? 'bg-red-100 text-red-800' :
+              tooltip.suggestion.type === 'style' ? 'bg-blue-100 text-blue-800' :
+              'bg-purple-100 text-purple-800'
+            }`}>
+              {tooltip.suggestion.type}
+            </span>
+          </div>
+
+          {/* Original → Replacement */}
+          <div className="mb-3">
+            <div className="flex items-center space-x-2 text-sm">
+              <span className="text-red-600 line-through">{tooltip.suggestion.original}</span>
+              <span className="text-gray-400">→</span>
+              <span className="text-green-600 font-medium">{tooltip.suggestion.replacements[0]}</span>
+            </div>
+          </div>
+
+          {/* Explanation */}
+          <p className="text-sm text-gray-600 mb-3">
+            {tooltip.suggestion.explanation}
+          </p>
+
+          {/* Action Buttons */}
+          <div className="flex space-x-2">
+            <button
+              onClick={() => handleApplySuggestion(tooltip.suggestion!.id, tooltip.suggestion!.replacements[0])}
+              className="flex-1 px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors"
+            >
+              Apply
+            </button>
+            <button
+              onClick={() => handleDismissSuggestion(tooltip.suggestion!.id)}
+              className="flex-1 px-3 py-1 bg-gray-600 text-white rounded text-sm font-medium hover:bg-gray-700 transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+
+          {/* Tooltip Arrow */}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2">
+            <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-white"></div>
+            <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-200 -mt-px"></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

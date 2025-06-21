@@ -32,7 +32,7 @@ A web-based writing assistant that helps ESL students improve their academic wri
 
 3. Set up LanguageTool:
    ```bash
-   docker run -d -p 8010:8010 quay.io/languagetool/languagetool:latest
+   docker run -d --restart always --name languagetool -p 8010:8010 erikvl87/languagetool
    ```
    
    This will start LanguageTool on http://localhost:8010. The application will automatically fall back to a mock grammar checker if LanguageTool is not available.
@@ -120,4 +120,21 @@ src/
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+### Grammar checking (LanguageTool)
+
+```bash
+# One-time image download
+docker run -d --restart always --name languagetool -p 8010:8010 erikvl87/languagetool
+```
+
+Set `NEXT_PUBLIC_LT_URL` if you deploy LT elsewhere, or `NEXT_PUBLIC_DISABLE_LT=true` to disable in CI.
+
+The grammar checker uses LanguageTool for:
+- Spelling mistakes
+- Grammar errors
+- Style suggestions
+- Punctuation
+
+You can test the connection by visiting `/api/lt-self-test` in development. 
