@@ -451,17 +451,17 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('❌ GET Error in /api/saveDoc:', error);
     
+    // Enhanced error response with diagnostics
     const errorDetails = error instanceof Error ? {
       name: error.name,
       message: error.message,
-      isDecoderError: error.message.includes('DECODER routines::unsupported'),
-      stack: error.stack?.substring(0, 500)
-    } : { message: 'Unknown error' };
+      stack: error.stack?.substring(0, 500), // Include a portion of the stack trace
+      cause: (error as any).cause,
+    } : { message: 'Unknown error occurred' };
     
     return NextResponse.json({
-      error: 'Failed to load documents',
+      error: 'Failed to load documents due to a server error.',
       details: errorDetails,
-      diagnostic: 'Check Vercel function logs for detailed Firebase Admin diagnostics'
     }, { status: 500 });
   }
 }
