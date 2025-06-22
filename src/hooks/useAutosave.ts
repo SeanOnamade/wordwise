@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { auth } from '@/lib/firebase';
 
 interface UseAutosaveProps {
@@ -20,6 +20,73 @@ export function useAutosave({ docId, content, title, createdAt, enabled = true }
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const forceSave = useCallback(async (overrideData?: { content: string; title: string }) => {
+    if (!enabled || !docId || !auth?.currentUser) {
+      console.log('📝 Force save skipped - conditions not met');
+      return;
+    }
+
+    const contentToSave = overrideData?.content ?? content;
+    const titleToSave = overrideData?.title ?? title;
+
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      console.log('📝 Force saving document...', {
+        docId,
+        userId: auth.currentUser?.uid,
+        contentLength: contentToSave.length,
+        title: titleToSave,
+      });
+
+      const response = await fetch('/api/saveDoc', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: auth.currentUser?.uid,
+          docId,
+          title: titleToSave,
+          content: contentToSave,
+          createdAt: createdAt && !lastSaved ? createdAt : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save document');
+      }
+
+      console.log('✅ Document force-saved successfully', {
+        docId,
+        length: contentToSave.length,
+        title: titleToSave,
+        timestamp: new Date().toISOString(),
+      });
+
+      lastSavedRef.current = { content: contentToSave, title: titleToSave };
+      setLastSaved(new Date());
+    } catch (err) {
+      const error = err as Error;
+      console.error('🔥 Force save FAILED', {
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        },
+        docId,
+        contentLength: contentToSave.length,
+        title: titleToSave,
+        timestamp: new Date().toISOString(),
+      });
+      setError(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [docId, content, title, createdAt, enabled, lastSaved]);
 
   useEffect(() => {
     // Early return if conditions aren't met
@@ -70,7 +137,7 @@ export function useAutosave({ docId, content, title, createdAt, enabled = true }
           docId,
           userId: auth.currentUser?.uid,
           contentLength: content.length,
-          title
+          title,
         });
 
         const response = await fetch('/api/saveDoc', {
@@ -83,7 +150,7 @@ export function useAutosave({ docId, content, title, createdAt, enabled = true }
             docId,
             title,
             content,
-            createdAt: createdAt && !lastSaved ? createdAt : undefined
+            createdAt: createdAt && !lastSaved ? createdAt : undefined,
           }),
         });
 
@@ -132,6 +199,7 @@ export function useAutosave({ docId, content, title, createdAt, enabled = true }
   return {
     lastSaved,
     isSaving,
-    error
+    error,
+    forceSave
   };
 } 

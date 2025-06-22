@@ -139,6 +139,7 @@ interface TipTapEditorProps {
   onEditorCreate?: (editor: any) => void;
   onGrammarCheckStart?: () => void;
   onGrammarCheckEnd?: () => void;
+  onSuggestionApplied?: () => Promise<void>;
 }
 
 export default function TipTapEditor({
@@ -148,7 +149,8 @@ export default function TipTapEditor({
   onTextChange,
   onEditorCreate,
   onGrammarCheckStart,
-  onGrammarCheckEnd
+  onGrammarCheckEnd,
+  onSuggestionApplied
 }: TipTapEditorProps) {
   
   const updateTimeoutRef = useRef<NodeJS.Timeout>();
@@ -432,7 +434,7 @@ export default function TipTapEditor({
   }, []);
 
   // Handle suggestion application
-  const handleApplySuggestion = useCallback((suggestionId: string, replacement: string) => {
+  const handleApplySuggestion = useCallback(async (suggestionId: string, replacement: string) => {
     if (!editor) return;
     
     const suggestion = suggestions.find(s => s.id === suggestionId);
@@ -455,7 +457,13 @@ export default function TipTapEditor({
     
     // Hide tooltip
     setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
-  }, [editor, suggestions, updateSuggestionStatus]);
+
+    // Trigger immediate autosave after suggestion application
+    if (onSuggestionApplied) {
+      console.log('💾 Triggering immediate autosave after suggestion application in TipTapEditor');
+      await onSuggestionApplied();
+    }
+  }, [editor, suggestions, updateSuggestionStatus, onSuggestionApplied]);
 
   // Handle suggestion dismissal
   const handleDismissSuggestion = useCallback((suggestionId: string) => {

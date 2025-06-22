@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useEditorStore } from '@/store/editorStore';
 import { auth } from '@/lib/firebase';
 import Sidebar from './components/Sidebar';
@@ -47,13 +47,35 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
   }, [editorInstance]);
 
   // Integrate improved autosave
-  const { lastSaved, isSaving, error: saveError } = useAutosave({
+  const { lastSaved, isSaving, error: saveError, forceSave } = useAutosave({
     docId: currentDoc?.id || '',
     content: currentDoc?.content || '',
     title: currentDoc?.title || 'Untitled Document',
     createdAt: currentDoc?.createdAt || null,
     enabled: !!auth?.currentUser && !!currentDoc?.id
   });
+
+  const handleSuggestionApplied = useCallback(async () => {
+    if (!editorInstance) {
+      console.error("Cannot save after suggestion, editor instance not available.");
+      return;
+    }
+    
+    // The editor content is updated synchronously by tiptap,
+    // so we can get the latest HTML right away.
+    const latestContent = editorInstance.getHTML();
+    const latestTitle = currentDoc?.title || 'Untitled Document';
+    
+    console.log('📝 Triggering save with latest content after suggestion.', { length: latestContent.length });
+
+    // Also update the Zustand store so the hook's own `content` state 
+    // is up-to-date for the next regular, debounced save.
+    if (currentDoc) {
+      updateDocument({ ...currentDoc, content: latestContent, title: latestTitle });
+    }
+
+    await forceSave({ content: latestContent, title: latestTitle });
+  }, [editorInstance, forceSave, currentDoc, updateDocument]);
 
   const handleContentChange = (content: string) => {
     if (currentDoc) {
@@ -187,6 +209,7 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
                 onEditorCreate={setEditorInstance}
                 onGrammarCheckStart={() => setIsGrammarChecking(true)}
                 onGrammarCheckEnd={() => setIsGrammarChecking(false)}
+                onSuggestionApplied={handleSuggestionApplied}
               />
             </div>
           </div>
@@ -196,6 +219,7 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
             <SuggestionDrawer 
               editor={editorInstance} 
               isLoading={isGrammarChecking}
+              onSuggestionApplied={handleSuggestionApplied}
             />
           </div>
         </div>

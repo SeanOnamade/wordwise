@@ -399,7 +399,7 @@ const Editor = () => {
     isAuthenticated: !!auth?.currentUser 
   });
   
-  useAutosave({
+  const { forceSave } = useAutosave({
     docId: currentDoc?.id || '',
     content: currentDoc?.content || '',
     title: currentDoc?.title || '',
@@ -480,7 +480,7 @@ const Editor = () => {
   };
 
   // Enhanced apply suggestion with undo support
-  const handleApplySuggestion = (suggestionId: string, replacement: string) => {
+  const handleApplySuggestion = async (suggestionId: string, replacement: string) => {
     const suggestion = suggestions.find(s => s.id === suggestionId);
     
     if (suggestion && editor) {
@@ -519,6 +519,10 @@ const Editor = () => {
         tr.setMeta('suggestionsChanged', true);
         view.dispatch(tr);
       }, 100);
+
+      // Trigger immediate autosave after suggestion application
+      console.log('💾 Triggering immediate autosave after suggestion application');
+      await forceSave();
     } else {
       console.log('Cannot apply suggestion: editor not ready or suggestion not found');
     }

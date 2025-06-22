@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 interface SuggestionDrawerProps {
   editor: any;
   isLoading?: boolean;
+  onSuggestionApplied?: () => Promise<void>;
 }
 
-export default function SuggestionDrawer({ editor, isLoading = false }: SuggestionDrawerProps) {
+export default function SuggestionDrawer({ editor, isLoading = false, onSuggestionApplied }: SuggestionDrawerProps) {
   const { suggestions, updateSuggestionStatus } = useEditorStore();
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
@@ -85,6 +86,12 @@ export default function SuggestionDrawer({ editor, isLoading = false }: Suggesti
           tr.setMeta('suggestionsChanged', true);
           view.dispatch(tr);
         }, 100);
+
+        // Trigger immediate autosave after suggestion application
+        if (onSuggestionApplied) {
+          console.log('💾 Triggering immediate autosave after suggestion application in drawer');
+          await onSuggestionApplied();
+        }
       }
     } catch (error) {
       console.error('Error applying suggestion:', error);
