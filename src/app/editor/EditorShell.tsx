@@ -40,6 +40,7 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
     docId: currentDoc?.id || '',
     content: currentDoc?.content || '',
     title: currentDoc?.title || 'Untitled Document',
+    createdAt: currentDoc?.createdAt || null,
     enabled: !!auth?.currentUser && !!currentDoc?.id
   });
 
@@ -163,6 +164,14 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
               <Badge variant="secondary" className="text-xs bg-white/10 text-slate-300 border-white/20">
                 {user?.email || 'Anonymous'}
               </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onSignOut}
+                className="text-slate-300 hover:text-white border-slate-500 hover:border-slate-400"
+              >
+                Sign Out
+              </Button>
             </div>
           </div>
           
@@ -187,7 +196,7 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
             <div className="flex items-center space-x-2">
               <CopyHTMLButton 
                 editor={editorInstance} 
-                className="text-slate-300 hover:text-white border-slate-500 hover:border-slate-400"
+                className="text-black"
               />
               
               <Button 

@@ -42,6 +42,57 @@ export default function Sidebar() {
     });
   };
 
+  const loadDocuments = async () => {
+    if (!auth?.currentUser) {
+      console.log('📚 Document load skipped - no authenticated user');
+      return;
+    }
+    
+    try {
+      console.log('📚 Loading documents for user:', auth.currentUser.uid);
+      setIsLoading(true);
+      
+      const response = await fetch(`/api/saveDoc?userId=${auth.currentUser.uid}`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📚 Documents loaded successfully:', {
+          count: data.documents?.length || 0,
+          firstDoc: data.documents?.[0]?.id
+        });
+        
+        if (data.documents) {
+          const docs = data.documents.map((doc: any) => ({
+            id: doc.id,
+            title: doc.title || 'Untitled Document',
+            content: doc.content || '',
+            lastModified: doc.lastModified ? new Date(doc.lastModified) : new Date(doc.createdAt),
+            createdAt: doc.createdAt ? new Date(doc.createdAt) : new Date()
+          }));
+          setDocuments(docs);
+
+          // If no current document is selected, select the most recent one
+          if (!currentDoc && docs.length > 0) {
+            setCurrentDoc(docs[0]);
+          }
+        } else {
+          setDocuments([]); // Ensure documents is always an array
+        }
+      } else {
+        const errorData = await response.json();
+        console.error('📚 Failed to load documents:', {
+          status: response.status,
+          error: errorData
+        });
+        setDocuments([]); // Ensure documents is always an array
+      }
+    } catch (error) {
+      console.error('📚 Error loading documents:', error);
+      setDocuments([]); // Ensure documents is always an array
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleDeleteDocument = async (docId: string, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent document selection when clicking delete
     setDeletingDoc(docId);
@@ -61,6 +112,8 @@ export default function Sidebar() {
 
       if (response.ok) {
         console.log('✅ Document deleted successfully:', docId);
+        
+        // Remove from local store
         removeDocument(docId);
         
         // If we deleted the current document, select another one
@@ -68,6 +121,9 @@ export default function Sidebar() {
           const remainingDocs = (documents || []).filter(d => d.id !== docId);
           setCurrentDoc(remainingDocs.length > 0 ? remainingDocs[0] : null);
         }
+
+        // Reload documents list from server to ensure sync
+        await loadDocuments();
       } else {
         const error = await response.json();
         console.error('❌ Failed to delete document:', error);
@@ -81,59 +137,8 @@ export default function Sidebar() {
     }
   };
 
-  // Load user's documents
+  // Load user's documents on mount
   useEffect(() => {
-    const loadDocuments = async () => {
-      if (!auth?.currentUser) {
-        console.log('📚 Document load skipped - no authenticated user');
-        return;
-      }
-      
-      try {
-        console.log('📚 Loading documents for user:', auth.currentUser.uid);
-        setIsLoading(true);
-        
-        const response = await fetch(`/api/saveDoc?userId=${auth.currentUser.uid}`);
-        if (response.ok) {
-          const data = await response.json();
-          console.log('📚 Documents loaded successfully:', {
-            count: data.documents?.length || 0,
-            firstDoc: data.documents?.[0]?.id
-          });
-          
-          if (data.documents) {
-            const docs = data.documents.map((doc: any) => ({
-              id: doc.id,
-              title: doc.title || 'Untitled Document',
-              content: doc.content || '',
-              lastModified: doc.updatedAt ? new Date(doc.updatedAt) : undefined,
-              createdAt: doc.createdAt ? new Date(doc.createdAt) : undefined
-            }));
-            setDocuments(docs);
-
-            // If no current document is selected, select the most recent one
-            if (!currentDoc && docs.length > 0) {
-              setCurrentDoc(docs[0]);
-            }
-          } else {
-            setDocuments([]); // Ensure documents is always an array
-          }
-        } else {
-          const errorData = await response.json();
-          console.error('📚 Failed to load documents:', {
-            status: response.status,
-            error: errorData
-          });
-          setDocuments([]); // Ensure documents is always an array
-        }
-      } catch (error) {
-        console.error('📚 Error loading documents:', error);
-        setDocuments([]); // Ensure documents is always an array
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadDocuments();
   }, []);
 
@@ -150,8 +155,8 @@ export default function Sidebar() {
             id: data.document.id,
             title: data.document.title || 'Untitled Document',
             content: data.document.content || '',
-            lastModified: data.document.updatedAt ? new Date(data.document.updatedAt) : undefined,
-            createdAt: data.document.createdAt ? new Date(data.document.createdAt) : undefined
+            lastModified: data.document.lastModified ? new Date(data.document.lastModified) : new Date(data.document.createdAt),
+            createdAt: data.document.createdAt ? new Date(data.document.createdAt) : new Date()
           };
           console.log('📚 Document loaded successfully:', {
             id: loadedDoc.id,
@@ -168,53 +173,24 @@ export default function Sidebar() {
     }
   };
 
-  const createNewDocument = async () => {
+  const createNewDocument = () => {
     if (!auth?.currentUser) {
       console.log('📝 Cannot create document - no authenticated user');
       return;
     }
 
+    const creationDate = new Date();
     const newDoc: Document = {
       id: crypto.randomUUID(),
       title: 'Untitled Document',
       content: '',
-      lastModified: new Date(),
-      createdAt: new Date()
+      lastModified: creationDate,
+      createdAt: creationDate,
     };
 
-    try {
-      console.log('📝 Creating new document:', {
-        id: newDoc.id,
-        userId: auth.currentUser.uid
-      });
-
-      const response = await fetch('/api/saveDoc', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: auth.currentUser.uid,
-          docId: newDoc.id,
-          title: newDoc.title,
-          content: newDoc.content || '' // Ensure content is never undefined
-        }),
-      });
-
-      if (response.ok) {
-        console.log('📝 Document created successfully:', newDoc.id);
-        setDocuments([newDoc, ...(documents || [])]);
-        setCurrentDoc(newDoc); // Set as current document immediately
-      } else {
-        const errorData = await response.json();
-        console.error('📝 Failed to create document:', {
-          status: response.status,
-          error: errorData
-        });
-      }
-    } catch (error) {
-      console.error('📝 Error creating document:', error);
-    }
+    console.log('📝 Creating new document locally:', newDoc.id);
+    setDocuments([newDoc, ...(documents || [])]);
+    setCurrentDoc(newDoc);
   };
 
   return (

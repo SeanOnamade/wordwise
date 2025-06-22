@@ -58,9 +58,9 @@ export default function CopyHTMLButton({ editor, className = '' }: CopyHTMLButto
     <Button
       onClick={handleCopyAsHTML}
       disabled={!editor}
-      variant="outline"
+      variant="default"
       size="sm"
-      className={`${className} ${copied ? 'bg-green-50 text-green-700 border-green-200' : ''}`}
+      className={`${className} bg-indigo-400 hover:bg-indigo-500 disabled:opacity-50 ${copied ? 'bg-green-500 hover:bg-green-600' : ''}`}
       title="Copy document as clean HTML to clipboard"
       aria-label="Copy document content as HTML to clipboard for use in other applications"
     >

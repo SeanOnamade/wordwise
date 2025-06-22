@@ -1,9 +1,68 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useEffect, useState } from 'react';
+import { auth } from '@/lib/firebase';
+import { signOut, User } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user: User | null) => {
+      setUser(user);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      router.push('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-800 transition-colors duration-300">
+      {/* Header */}
+      <header className="bg-white/10 backdrop-blur-md border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="text-2xl font-bold text-gray-900 dark:text-white">
+              WordWise
+            </Link>
+            <div className="flex items-center space-x-4">
+              {!loading && (
+                user ? (
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm text-gray-600 dark:text-gray-300">{user.email}</span>
+                    <Button 
+                      variant="outline"
+                      onClick={handleSignOut}
+                      className="text-sm"
+                    >
+                      Sign Out
+                    </Button>
+                  </div>
+                ) : (
+                  <Button asChild variant="outline" className="text-sm">
+                    <Link href="/login">Sign In</Link>
+                  </Button>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center">
           <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-white sm:text-5xl md:text-6xl">

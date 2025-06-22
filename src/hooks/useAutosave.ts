@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 
 interface UseAutosaveProps {
   docId: string;
   content: string;
   title: string;
+  createdAt: Date | null;
   enabled?: boolean;
 }
 
@@ -14,7 +14,7 @@ interface SavedState {
   title: string;
 }
 
-export function useAutosave({ docId, content, title, enabled = true }: UseAutosaveProps) {
+export function useAutosave({ docId, content, title, createdAt, enabled = true }: UseAutosaveProps) {
   const timeoutRef = useRef<NodeJS.Timeout>();
   const lastSavedRef = useRef<SavedState>({ content, title });
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -45,13 +45,6 @@ export function useAutosave({ docId, content, title, enabled = true }: UseAutosa
       return;
     }
 
-    // Early return if Firestore isn't initialized
-    if (!db) {
-      console.error('🔥 Firestore write FAILED: Firestore not initialized');
-      setError('Firestore not initialized');
-      return;
-    }
-
     console.log('📝 Starting autosave cycle...', {
       docId,
       contentLength: content.length,
@@ -73,29 +66,33 @@ export function useAutosave({ docId, content, title, enabled = true }: UseAutosa
         setIsSaving(true);
         setError(null);
 
-        // Double-check Firestore is still initialized
-        if (!db) {
-          throw new Error('Firestore not initialized');
-        }
-        
-        const docRef = doc(db, 'documents', docId);
-        const data = {
-          ownerUid: auth.currentUser?.uid,
-          title,
-          content,
-          updatedAt: serverTimestamp() // Changed from lastModified to match our schema
-        };
-
-        console.log('📝 Attempting Firestore write...', {
+        console.log('📝 Attempting to save document...', {
           docId,
           userId: auth.currentUser?.uid,
           contentLength: content.length,
           title
         });
 
-        await setDoc(docRef, data, { merge: true });
+        const response = await fetch('/api/saveDoc', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: auth.currentUser?.uid,
+            docId,
+            title,
+            content,
+            createdAt: createdAt && !lastSaved ? createdAt : undefined
+          }),
+        });
 
-        console.log('✅ Firestore write SUCCESS', { 
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to save document');
+        }
+
+        console.log('✅ Document saved successfully', { 
           docId, 
           length: content.length,
           title,
@@ -106,7 +103,7 @@ export function useAutosave({ docId, content, title, enabled = true }: UseAutosa
         setLastSaved(new Date());
       } catch (err) {
         const error = err as Error;
-        console.error('🔥 Firestore write FAILED', {
+        console.error('🔥 Document save FAILED', {
           error: {
             name: error.name,
             message: error.message,
@@ -130,7 +127,7 @@ export function useAutosave({ docId, content, title, enabled = true }: UseAutosa
     return () => {
       clearTimeout(saveTimeout);
     };
-  }, [docId, content, title, enabled]);
+  }, [docId, content, title, createdAt, enabled]);
 
   return {
     lastSaved,

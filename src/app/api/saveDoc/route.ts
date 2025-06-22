@@ -163,14 +163,6 @@ async function queryFirestoreREST(userId: string) {
       processedPrivateKey = processedPrivateKey.replace(/\\n/g, '\n');
     }
 
-    console.log('🔑 Google Auth private key processing:', {
-      originalLength: privateKey.length,
-      processedLength: processedPrivateKey.length,
-      startsWithQuote: privateKey.startsWith('"'),
-      hasEscapedNewlines: privateKey.includes('\\n'),
-      finalHasRealNewlines: processedPrivateKey.includes('\n')
-    });
-
     // Create credentials object for Google Auth
     const credentials = {
       type: 'service_account',
@@ -199,30 +191,29 @@ async function queryFirestoreREST(userId: string) {
 
     console.log('✅ Google Auth Library authentication successful');
 
-    // Query Firestore using REST API
+    // Query Firestore using REST API with updated collection path
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`;
     
     const queryBody = {
       structuredQuery: {
-        from: [{ collectionId: 'documents' }],
-        where: {
-          fieldFilter: {
-            field: { fieldPath: 'ownerUid' },
-            op: 'EQUAL',
-            value: { stringValue: userId }
-          }
-        },
+        from: [{ 
+          collectionId: 'documents',
+          parent: `projects/${projectId}/databases/(default)/documents/users/${userId}`
+        }],
         orderBy: [
           {
             field: { fieldPath: 'updatedAt' },
             direction: 'DESCENDING'
           }
-        ],
-        limit: 50
+        ]
       }
     };
 
-    console.log('📡 Making Firestore REST API request...');
+    console.log('📡 Making Firestore REST API request...', {
+      userId,
+      collectionPath: `users/${userId}/documents`
+    });
+
     const queryResponse = await fetch(firestoreUrl, {
       method: 'POST',
       headers: {
@@ -288,12 +279,23 @@ async function queryFirestoreREST(userId: string) {
   }
 }
 
+// Helper to convert Firestore doc to JSON-friendly format
+const docToJson = (doc: QueryDocumentSnapshot) => {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    ...data,
+    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+    updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
+  };
+};
+
 export async function POST(request: Request) {
   try {
     // Run pre-flight diagnostics
     assertAdminConfig();
     
-    const { userId, docId, title, content = '' } = await request.json();
+    const { userId, docId, title, content = '', createdAt } = await request.json();
 
     if (!userId || !docId || !title) {
       return NextResponse.json(
@@ -315,8 +317,8 @@ export async function POST(request: Request) {
     // Test Firestore connection before proceeding
     await testFirestoreConnection();
 
-    // Check if document exists
-    const docRef = adminDb.collection('documents').doc(docId);
+    // Use nested collection path
+    const docRef = adminDb.collection('users').doc(userId).collection('documents').doc(docId);
     const docSnapshot = await docRef.get();
     const isNewDoc = !docSnapshot.exists;
 
@@ -335,7 +337,6 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error saving document:', error);
     
-    // Enhanced error response with diagnostics
     const errorDetails = error instanceof Error ? {
       name: error.name,
       message: error.message,
@@ -409,8 +410,8 @@ export async function GET(request: Request) {
           usedRestApi: true
         });
       } else {
-        // Use Admin SDK
-        const docRef = adminDb.collection('documents').doc(docId);
+        // Use Admin SDK with nested path
+        const docRef = adminDb.collection('users').doc(userId).collection('documents').doc(docId);
         const docSnapshot = await docRef.get();
         
         if (!docSnapshot.exists) {
@@ -420,120 +421,30 @@ export async function GET(request: Request) {
           );
         }
 
-        const docData = docSnapshot.data();
-        
-        // Check if user owns the document
-        if (docData?.ownerUid !== userId) {
-          return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 403 }
-          );
-        }
-
         return NextResponse.json({
           success: true,
-          document: {
-            id: docSnapshot.id,
-            ...docData
-          }
+          document: docToJson(docSnapshot as QueryDocumentSnapshot)
         });
       }
     } else {
-      // Load all user documents
-      console.log('📂 Loading all documents for user:', userId);
+      // Load all user documents using nested path
+      console.log('📚 Getting all documents for user:', userId);
+      const querySnapshot = await adminDb.collection('users').doc(userId).collection('documents').get();
       
-      if (connectionTest.method === 'rest-api') {
-        console.log('🌐 Using REST API for document query...');
-        const documents = await queryFirestoreREST(userId);
-        
-        return NextResponse.json({
-          success: true,
-          documents,
-          usedRestApi: true,
-          note: 'Used Firestore REST API to bypass serverless gRPC limitations'
-        });
-      } else {
-        console.log('🔧 Using Admin SDK for document query...');
-        
-        try {
-          // Add detailed diagnostics before the query
-          console.log('🔍 Pre-query diagnostics:', {
-            adminDbExists: !!adminDb,
-            userId: userId,
-            userIdType: typeof userId,
-            userIdLength: userId.length,
-            environment: process.env.NODE_ENV,
-            vercelEnv: process.env.VERCEL_ENV
-          });
+      const documents = querySnapshot.docs.map(docToJson);
 
-          // Log the exact query being attempted
-          console.log('📊 Attempting Firestore query with parameters:', {
-            collection: 'documents',
-            whereField: 'ownerUid',
-            whereOperator: '==',
-            whereValue: userId,
-            orderByField: 'updatedAt',
-            orderByDirection: 'desc',
-            limitValue: 50
-          });
-
-          const docsSnapshot = await retryFirestoreOperation(async () => {
-            return await adminDb
-              .collection('documents')
-              .where('ownerUid', '==', userId)
-              .orderBy('updatedAt', 'desc')
-              .limit(50)
-              .get();
-          });
-
-          console.log('📂 Query completed, found documents:', docsSnapshot.size);
-
-          const documents = docsSnapshot.docs.map((doc: QueryDocumentSnapshot) => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-
-          return NextResponse.json({
-            success: true,
-            documents
-          });
-        } catch (queryError) {
-          console.error('📂 Firestore query error:', queryError);
-          
-          // Final fallback to REST API if Admin SDK query fails
-          if (queryError instanceof Error && queryError.message.includes('DECODER routines::unsupported')) {
-            console.error('🔍 DECODER error during READ operation detected!');
-            console.error('🌐 Final fallback to REST API...');
-            
-            try {
-              const documents = await queryFirestoreREST(userId);
-              
-              return NextResponse.json({
-                success: true,
-                documents,
-                usedRestFallback: true,
-                note: 'Used Firestore REST API to bypass serverless gRPC limitations'
-              });
-            } catch (restError) {
-              console.error('❌ REST API fallback also failed:', restError);
-            }
-          }
-          
-          // Return more specific error information
-          return NextResponse.json({
-            error: 'Database query failed',
-            details: queryError instanceof Error ? queryError.message : 'Unknown error',
-            code: 'FIRESTORE_QUERY_ERROR',
-            isDecoderError: queryError instanceof Error && queryError.message.includes('DECODER routines::unsupported'),
-            troubleshooting: 'Check Vercel function logs for detailed diagnostics'
-          }, { status: 500 });
-        }
-      }
+      // Sort documents manually to ensure correct order
+      documents.sort((a, b) => {
+        const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return dateB - dateA;
+      });
+      
+      return NextResponse.json({ documents });
     }
   } catch (error) {
-    console.error('Error loading documents:', error);
+    console.error('❌ GET Error in /api/saveDoc:', error);
     
-    // Enhanced error response with diagnostics
     const errorDetails = error instanceof Error ? {
       name: error.name,
       message: error.message,
@@ -578,22 +489,14 @@ export async function DELETE(request: Request) {
     // Test Firestore connection before proceeding
     await testFirestoreConnection();
 
-    // Check if document exists and user owns it
-    const docRef = adminDb.collection('documents').doc(docId);
+    // Check if document exists using nested path
+    const docRef = adminDb.collection('users').doc(userId).collection('documents').doc(docId);
     const docSnapshot = await docRef.get();
     
     if (!docSnapshot.exists) {
       return NextResponse.json(
         { error: 'Document not found' },
         { status: 404 }
-      );
-    }
-
-    const docData = docSnapshot.data();
-    if (docData?.ownerUid !== userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
       );
     }
 
