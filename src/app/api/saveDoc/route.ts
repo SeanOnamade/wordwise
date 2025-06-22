@@ -147,19 +147,10 @@ async function queryFirestoreREST(userId: string) {
       throw new Error('Missing Firebase credentials for REST API');
     }
 
-    // Create JWT token for authentication
-    const jwt = require('jsonwebtoken');
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-      iss: clientEmail,
-      sub: clientEmail,
-      aud: 'https://firestore.googleapis.com/google.firestore.v1.Firestore',
-      iat: now,
-      exp: now + 3600, // 1 hour
-      scope: 'https://www.googleapis.com/auth/datastore'
-    };
-
-    // More thorough private key processing for JWT
+    // Use Google Auth Library instead of manual JWT
+    const { GoogleAuth } = require('google-auth-library');
+    
+    // Process private key properly
     let processedPrivateKey = privateKey;
     
     // Remove JSON quotes if present
@@ -171,50 +162,42 @@ async function queryFirestoreREST(userId: string) {
     if (processedPrivateKey.includes('\\n')) {
       processedPrivateKey = processedPrivateKey.replace(/\\n/g, '\n');
     }
-    
-    // Ensure proper PEM format
-    if (!processedPrivateKey.startsWith('-----BEGIN PRIVATE KEY-----')) {
-      processedPrivateKey = '-----BEGIN PRIVATE KEY-----\n' + processedPrivateKey;
-    }
-    if (!processedPrivateKey.endsWith('-----END PRIVATE KEY-----')) {
-      processedPrivateKey = processedPrivateKey + '\n-----END PRIVATE KEY-----';
-    }
-    
-    // Clean up any double formatting
-    processedPrivateKey = processedPrivateKey
-      .replace(/-----BEGIN PRIVATE KEY-----\s+/g, '-----BEGIN PRIVATE KEY-----\n')
-      .replace(/\s+-----END PRIVATE KEY-----/g, '\n-----END PRIVATE KEY-----');
 
-    console.log('🔑 JWT private key processing:', {
+    console.log('🔑 Google Auth private key processing:', {
       originalLength: privateKey.length,
       processedLength: processedPrivateKey.length,
       startsWithQuote: privateKey.startsWith('"'),
       hasEscapedNewlines: privateKey.includes('\\n'),
-      finalHasRealNewlines: processedPrivateKey.includes('\n'),
-      finalStartsCorrectly: processedPrivateKey.startsWith('-----BEGIN PRIVATE KEY-----'),
-      finalEndsCorrectly: processedPrivateKey.endsWith('-----END PRIVATE KEY-----')
+      finalHasRealNewlines: processedPrivateKey.includes('\n')
     });
 
-    const token = jwt.sign(payload, processedPrivateKey, { algorithm: 'RS256' });
+    // Create credentials object for Google Auth
+    const credentials = {
+      type: 'service_account',
+      project_id: projectId,
+      client_email: clientEmail,
+      private_key: processedPrivateKey,
+      private_key_id: 'dummy', // Not required for auth
+      client_id: 'dummy', // Not required for auth
+      auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+      token_uri: 'https://oauth2.googleapis.com/token'
+    };
 
-    // Get access token
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        assertion: token
-      })
+    // Initialize Google Auth with service account
+    const auth = new GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/datastore']
     });
 
-    if (!tokenResponse.ok) {
-      throw new Error(`Token request failed: ${tokenResponse.status}`);
+    console.log('🔐 Getting access token with Google Auth Library...');
+    const authClient = await auth.getClient();
+    const accessToken = await authClient.getAccessToken();
+
+    if (!accessToken.token) {
+      throw new Error('Failed to get access token from Google Auth Library');
     }
 
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
+    console.log('✅ Google Auth Library authentication successful');
 
     // Query Firestore using REST API
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`;
@@ -239,17 +222,24 @@ async function queryFirestoreREST(userId: string) {
       }
     };
 
+    console.log('📡 Making Firestore REST API request...');
     const queryResponse = await fetch(firestoreUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${accessToken.token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(queryBody)
     });
 
     if (!queryResponse.ok) {
-      throw new Error(`Firestore REST query failed: ${queryResponse.status}`);
+      const errorText = await queryResponse.text();
+      console.error('❌ Firestore REST query failed:', {
+        status: queryResponse.status,
+        statusText: queryResponse.statusText,
+        error: errorText
+      });
+      throw new Error(`Firestore REST query failed: ${queryResponse.status} - ${errorText}`);
     }
 
     const queryData = await queryResponse.json();
