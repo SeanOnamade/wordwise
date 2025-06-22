@@ -24,6 +24,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           disabled={!editor.can().undo()}
           className="text-slate-600 hover:text-slate-900 hover:bg-slate-200 disabled:opacity-50 px-2 py-1 h-8"
           title="Undo (Ctrl+Z)"
+          aria-label="Undo last action"
+          role="button"
         >
           ↶
         </Button>
@@ -34,6 +36,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           disabled={!editor.can().redo()}
           className="text-slate-600 hover:text-slate-900 hover:bg-slate-200 disabled:opacity-50 px-2 py-1 h-8"
           title="Redo (Ctrl+Y)"
+          aria-label="Redo last undone action"
+          role="button"
         >
           ↷
         </Button>
@@ -48,6 +52,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Heading 1"
+          aria-label="Apply heading level 1 formatting"
+          role="button"
         >
           H1
         </Toggle>
@@ -58,6 +64,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Heading 2"
+          aria-label="Apply heading level 2 formatting"
+          role="button"
         >
           H2
         </Toggle>
@@ -68,6 +76,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Heading 3"
+          aria-label="Apply heading level 3 formatting"
+          role="button"
         >
           H3
         </Toggle>
@@ -78,6 +88,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Paragraph"
+          aria-label="Apply paragraph formatting"
+          role="button"
         >
           P
         </Toggle>
@@ -92,6 +104,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Bold (Ctrl+B)"
+          aria-label="Toggle bold formatting"
+          role="button"
         >
           <span className="font-bold">B</span>
         </Toggle>
@@ -102,6 +116,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Italic (Ctrl+I)"
+          aria-label="Toggle italic formatting"
+          role="button"
         >
           <span className="italic">I</span>
         </Toggle>
@@ -112,6 +128,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Underline (Ctrl+U)"
+          aria-label="Toggle underline formatting"
+          role="button"
         >
           <span className="underline">U</span>
         </Toggle>
@@ -122,6 +140,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Strikethrough"
+          aria-label="Toggle strikethrough formatting"
+          role="button"
         >
           <span className="line-through">S</span>
         </Toggle>
@@ -132,6 +152,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Highlight"
+          aria-label="Toggle text highlighting"
+          role="button"
         >
           <span className="bg-yellow-200 px-1 rounded text-xs">H</span>
         </Toggle>
@@ -146,6 +168,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Align Left"
+          aria-label="Align text to the left"
+          role="button"
         >
           ⬅
         </Toggle>
@@ -156,6 +180,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Align Center"
+          aria-label="Center align text"
+          role="button"
         >
           ↔
         </Toggle>
@@ -166,6 +192,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Align Right"
+          aria-label="Align text to the right"
+          role="button"
         >
           ➡
         </Toggle>
@@ -176,6 +204,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Justify"
+          aria-label="Justify text alignment"
+          role="button"
         >
           ≡
         </Toggle>
@@ -190,6 +220,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Bullet List"
+          aria-label="Create bullet point list"
+          role="button"
         >
           •
         </Toggle>
@@ -200,6 +232,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
           className="data-[state=on]:bg-indigo-400 data-[state=on]:text-white hover:bg-slate-200 text-slate-600 px-2 py-1 h-8"
           size="sm"
           title="Numbered List"
+          aria-label="Create numbered list"
+          role="button"
         >
           1.
         </Toggle>

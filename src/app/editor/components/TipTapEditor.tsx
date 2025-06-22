@@ -137,6 +137,8 @@ interface TipTapEditorProps {
   onUpdate?: (content: string) => void;
   onTextChange?: (text: string) => void;
   onEditorCreate?: (editor: any) => void;
+  onGrammarCheckStart?: () => void;
+  onGrammarCheckEnd?: () => void;
 }
 
 export default function TipTapEditor({
@@ -144,7 +146,9 @@ export default function TipTapEditor({
   suggestions = [],
   onUpdate,
   onTextChange,
-  onEditorCreate
+  onEditorCreate,
+  onGrammarCheckStart,
+  onGrammarCheckEnd
 }: TipTapEditorProps) {
   
   const updateTimeoutRef = useRef<NodeJS.Timeout>();
@@ -172,6 +176,8 @@ export default function TipTapEditor({
       lastCheckRef.current = rawText;
       
       try {
+        onGrammarCheckStart?.();
+        
         // Clear existing suggestions
         clearSuggestions();
         
@@ -184,6 +190,8 @@ export default function TipTapEditor({
         });
       } catch (error) {
         console.error('Grammar check failed:', error);
+      } finally {
+        onGrammarCheckEnd?.();
       }
     }, 800)
   ).current;
@@ -204,6 +212,36 @@ export default function TipTapEditor({
         'Mod-Shift-e': () => this.editor.commands.setTextAlign('center'),
         'Mod-Shift-r': () => this.editor.commands.setTextAlign('right'),
         'Mod-Shift-j': () => this.editor.commands.setTextAlign('justify'),
+        'Mod-.': () => {
+          // Navigate to next suggestion
+          const activeSuggestions = suggestions.filter(s => s.status === 'new');
+          if (activeSuggestions.length > 0) {
+            const sortedSuggestions = activeSuggestions.sort((a, b) => a.range.from - b.range.from);
+            // Find first suggestion after current cursor position
+            const currentPos = this.editor.state.selection.from;
+            const nextSuggestion = sortedSuggestions.find(s => s.range.from > currentPos) || sortedSuggestions[0];
+            
+            // Scroll to and select the suggestion
+            this.editor.commands.setTextSelection({ from: nextSuggestion.range.from, to: nextSuggestion.range.to });
+            console.log('🔍 Navigated to next suggestion:', nextSuggestion.ruleKey);
+          }
+          return true;
+        },
+        'Mod-,': () => {
+          // Navigate to previous suggestion
+          const activeSuggestions = suggestions.filter(s => s.status === 'new');
+          if (activeSuggestions.length > 0) {
+            const sortedSuggestions = activeSuggestions.sort((a, b) => b.range.from - a.range.from);
+            // Find first suggestion before current cursor position
+            const currentPos = this.editor.state.selection.from;
+            const prevSuggestion = sortedSuggestions.find(s => s.range.from < currentPos) || sortedSuggestions[0];
+            
+            // Scroll to and select the suggestion
+            this.editor.commands.setTextSelection({ from: prevSuggestion.range.from, to: prevSuggestion.range.to });
+            console.log('🔍 Navigated to previous suggestion:', prevSuggestion.ruleKey);
+          }
+          return true;
+        },
       }
     }
   });

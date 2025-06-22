@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Packer, Document, Paragraph, TextRun, HeadingLevel } from 'docx';
+import { exportToPdf } from '@/lib/exportToPdf';
 
 // Enhanced HTML parser that preserves formatting
 interface FormattedText {
@@ -247,7 +247,7 @@ const contentToParagraphs = (content: string): Paragraph[] => {
 
 export async function POST(request: Request) {
   try {
-    const { content, format } = await request.json();
+    const { content, title, format } = await request.json();
 
     if (!content || !format) {
       return NextResponse.json(
@@ -265,208 +265,35 @@ export async function POST(request: Request) {
 
     let buffer: Buffer;
     let mimeType: string;
+    let filename: string;
 
     if (format === 'docx') {
       // Create DOCX using docx package
-      const paragraphs = contentToParagraphs(content);
-      
       const doc = new Document({
         sections: [{
           properties: {},
-          children: paragraphs
+          children: [
+            new Paragraph({
+              children: [new TextRun(content)]
+            })
+          ]
         }]
       });
       
       buffer = await Packer.toBuffer(doc);
       mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      filename = `${title || 'document'}.docx`;
     } else {
-      // Create PDF using pdf-lib with formatting preservation
-      const pdfDoc = await PDFDocument.create();
-      let page = pdfDoc.addPage();
-      
-      // Embed fonts for different styles
-      const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-      const italicFont = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
-      const boldItalicFont = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
-      
-      const { width, height } = page.getSize();
-      const fontSize = 12;
-      const headingFontSize = 16;
-      const lineHeight = fontSize * 1.4;
-      const margin = 50;
-      
-      const formattedTexts = parseHTMLToFormattedText(content);
-      let y = height - margin;
-      const maxWidth = width - (margin * 2);
-      
-      // Helper function to combine text segments into lines for mixed formatting
-      const buildMixedFormattedLines = (texts: FormattedText[]): Array<{segments: FormattedText[], isHeading: boolean}> => {
-        const lines: Array<{segments: FormattedText[], isHeading: boolean}> = [];
-        let currentSegments: FormattedText[] = [];
-        let currentIsHeading = false;
-        
-        for (const text of texts) {
-          if (text.text === '\n') {
-            if (currentSegments.length > 0) {
-              lines.push({ segments: currentSegments, isHeading: currentIsHeading });
-              currentSegments = [];
-              currentIsHeading = false;
-            }
-          } else if (text.isHeading) {
-            // Headings start a new line
-            if (currentSegments.length > 0) {
-              lines.push({ segments: currentSegments, isHeading: currentIsHeading });
-            }
-            lines.push({ segments: [text], isHeading: true });
-            currentSegments = [];
-            currentIsHeading = false;
-          } else {
-            currentSegments.push(text);
-            currentIsHeading = currentIsHeading || !!text.isHeading;
-          }
-        }
-        
-        if (currentSegments.length > 0) {
-          lines.push({ segments: currentSegments, isHeading: currentIsHeading });
-        }
-        
-        return lines;
-      };
-      
-      // Helper function to wrap mixed formatted text
-      const wrapMixedFormattedLine = (segments: FormattedText[], maxWidth: number) => {
-        const lines: Array<{text: string, format: FormattedText}[]> = [];
-        let currentLine: {text: string, format: FormattedText}[] = [];
-        let currentLineWidth = 0;
-        
-        for (const segment of segments) {
-          const words = segment.text.split(' ');
-          
-          for (let i = 0; i < words.length; i++) {
-            const word = words[i];
-            const wordWithSpace = (i === 0 && currentLine.length === 0) ? word : ' ' + word;
-            
-                         // Get font for this segment
-             let font = regularFont;
-             let segmentFontSize = segment.isHeading ? headingFontSize : fontSize;
-             
-             if (segment.isHeading) {
-               font = boldFont;
-             } else if (segment.bold && segment.italic) {
-               font = boldItalicFont;
-             } else if (segment.bold) {
-               font = boldFont;
-             } else if (segment.italic) {
-               font = italicFont;
-             }
-             
-             const wordWidth = font.widthOfTextAtSize(wordWithSpace, segmentFontSize);
-            
-            if (currentLineWidth + wordWidth <= maxWidth || currentLine.length === 0) {
-              currentLine.push({ text: wordWithSpace, format: segment });
-              currentLineWidth += wordWidth;
-                         } else {
-               lines.push(currentLine);
-               currentLine = [{ text: word, format: segment }];
-               currentLineWidth = font.widthOfTextAtSize(word, segmentFontSize);
-             }
-          }
-        }
-        
-        if (currentLine.length > 0) {
-          lines.push(currentLine);
-        }
-        
-        return lines;
-      };
-      
-      const formattedLines = buildMixedFormattedLines(formattedTexts);
-      
-      for (const line of formattedLines) {
-        if (line.segments.length === 0) continue;
-        
-        const wrappedLines = wrapMixedFormattedLine(line.segments, maxWidth);
-        
-        for (const wrappedLine of wrappedLines) {
-          // Check if we need a new page
-          const maxFontSize = Math.max(...wrappedLine.map(seg => seg.format.isHeading ? headingFontSize : fontSize));
-          if (y < margin + maxFontSize + 10) {
-            page = pdfDoc.addPage();
-            y = page.getSize().height - margin;
-          }
-          
-          let currentX = margin;
-          
-          // Draw each segment in the line
-          for (const segment of wrappedLine) {
-            const format = segment.format;
-            
-            // Determine font based on formatting
-            let font = regularFont;
-            let currentFontSize = format.isHeading ? headingFontSize : fontSize;
-            
-            if (format.isHeading) {
-              font = boldFont;
-            } else if (format.bold && format.italic) {
-              font = boldItalicFont;
-            } else if (format.bold) {
-              font = boldFont;
-            } else if (format.italic) {
-              font = italicFont;
-            }
-            
-            // Draw text segment
-            page.drawText(segment.text, {
-              x: currentX,
-              y,
-              size: currentFontSize,
-              font,
-              color: rgb(0, 0, 0),
-            });
-            
-            const segmentWidth = font.widthOfTextAtSize(segment.text, currentFontSize);
-            
-            // Add strikethrough line if needed
-            if (format.strikethrough) {
-              page.drawLine({
-                start: { x: currentX, y: y + currentFontSize * 0.3 },
-                end: { x: currentX + segmentWidth, y: y + currentFontSize * 0.3 },
-                thickness: 1,
-                color: rgb(0, 0, 0),
-              });
-            }
-            
-            // Add underline if needed
-            if (format.underline) {
-              page.drawLine({
-                start: { x: currentX, y: y - 2 },
-                end: { x: currentX + segmentWidth, y: y - 2 },
-                thickness: 1,
-                color: rgb(0, 0, 0),
-              });
-            }
-            
-            currentX += segmentWidth;
-          }
-          
-          y -= lineHeight;
-        }
-        
-        // Add extra spacing after headings
-        if (line.isHeading) {
-          y -= 8;
-        }
-      }
-      
-      buffer = Buffer.from(await pdfDoc.save());
+      // Create PDF using our new export utility
+      buffer = await exportToPdf({ html: content, title });
       mimeType = 'application/pdf';
+      filename = `${title || 'wordwise-export'}.pdf`;
     }
 
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': mimeType,
-        'Content-Disposition': `attachment; filename="document.${format}"`,
+        'Content-Disposition': `attachment; filename="${filename}"`,
       },
     });
   } catch (error) {

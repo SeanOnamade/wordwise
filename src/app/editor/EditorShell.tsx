@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import TipTapEditor from './components/TipTapEditor';
 import { useAutosave } from '@/hooks/useAutosave';
+import CopyHTMLButton from '@/components/ShareButton';
 
 interface EditorShellProps {
   user: any;
@@ -30,7 +31,9 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
   } = useEditorStore();
   
   const [editorInstance, setEditorInstance] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isGrammarChecking, setIsGrammarChecking] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Integrate improved autosave
   const { lastSaved, isSaving, error: saveError } = useAutosave({
@@ -42,11 +45,6 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
 
   const handleContentChange = (content: string) => {
     if (currentDoc) {
-      console.log('📝 Content updated:', {
-        docId: currentDoc.id,
-        contentLength: content.length
-      });
-      
       const updatedDoc = {
         ...currentDoc,
         content,
@@ -64,11 +62,6 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
 
   const handleTitleChange = (title: string) => {
     if (currentDoc) {
-      console.log('📝 Title updated:', {
-        docId: currentDoc.id,
-        title
-      });
-      
       const updatedDoc = {
         ...currentDoc,
         title,
@@ -80,6 +73,9 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
 
   const handleExport = async () => {
     if (!currentDoc?.content) return;
+    
+    setIsExporting(true);
+    setExportError(null);
     
     try {
       const response = await fetch('/api/export', {
@@ -94,19 +90,24 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
         }),
       });
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${currentDoc.title || 'document'}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.statusText}`);
       }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentDoc.title || 'document'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (error) {
       console.error('Export failed:', error);
+      setExportError(error instanceof Error ? error.message : 'Export failed');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -143,9 +144,17 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
               placeholder="Untitled Document"
             />
             <div className="flex items-center space-x-4 mt-1">
-              <span className="text-sm text-slate-400">
-                {isSaving ? 'Saving...' : lastSaved ? `Last saved ${formatLastUpdated(lastSaved)}` : 'Not saved yet'}
-              </span>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-slate-400">
+                  {isSaving ? 'Saving...' : lastSaved ? `Last saved ${formatLastUpdated(lastSaved)}` : 'Not saved yet'}
+                </span>
+                {isSaving && (
+                  <svg className="animate-spin h-4 w-4 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+              </div>
               {saveError && (
                 <span className="text-sm text-red-400">
                   Save error: {saveError}
@@ -164,19 +173,46 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
               {performanceMetrics.totalChecks > 0 && (
                 <span>• {performanceMetrics.lastResponseTime}ms</span>
               )}
-              {isLoading && (
-                <span className="text-indigo-400">• Checking grammar...</span>
+              {isGrammarChecking && (
+                <div className="flex items-center text-indigo-400">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Checking grammar...
+                </div>
               )}
             </div>
             
-            <Button 
-              variant="default" 
-              size="sm" 
-              className="bg-indigo-400 hover:bg-indigo-500 disabled:opacity-50"
-              onClick={handleExport}
-            >
-              Export
-            </Button>
+            <div className="flex items-center space-x-2">
+              <CopyHTMLButton 
+                editor={editorInstance} 
+                className="text-slate-300 hover:text-white border-slate-500 hover:border-slate-400"
+              />
+              
+              <Button 
+                variant="default" 
+                size="sm" 
+                className={`bg-indigo-400 hover:bg-indigo-500 disabled:opacity-50 ${isExporting ? 'cursor-not-allowed' : ''}`}
+                onClick={handleExport}
+                disabled={isExporting || !currentDoc?.content}
+              >
+                {isExporting ? (
+                  <div className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Exporting...
+                  </div>
+                ) : 'Export'}
+              </Button>
+              {exportError && (
+                <span className="text-xs text-red-400">
+                  {exportError}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -190,13 +226,18 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
                 onUpdate={handleContentChange}
                 onTextChange={handleTextChange}
                 onEditorCreate={setEditorInstance}
+                onGrammarCheckStart={() => setIsGrammarChecking(true)}
+                onGrammarCheckEnd={() => setIsGrammarChecking(false)}
               />
             </div>
           </div>
 
           {/* Suggestions Drawer */}
           <div className="w-80 border-l border-white/10">
-            <SuggestionDrawer editor={editorInstance} />
+            <SuggestionDrawer 
+              editor={editorInstance} 
+              isLoading={isGrammarChecking}
+            />
           </div>
         </div>
       </div>

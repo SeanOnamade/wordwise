@@ -1,0 +1,26 @@
+graph TD
+    A[User Browser] -->|HTTPS| B[Next.js Frontend]
+    B -->|WebSocket-like Updates| C[TipTap Rich Editor]
+    C -->|Document Changes| D[Zustand Store]
+    
+    B -->|API Calls| E[Next.js API Routes]
+    E -->|Grammar Check| F[LanguageTool Docker]
+    E -->|Document Storage| G[Firebase Firestore]
+    E -->|Authentication| H[Firebase Auth]
+    E -->|PDF Generation| I[PDFKit]
+    
+    G -->|User-specific Data| J[Personalized Suggestions Cache]
+    F -->|Grammar Rules| K[LanguageTool ML Models]
+    
+    L[Vercel Edge Functions] -->|Global CDN| A
+    M[Firebase Hosting] -->|Static Assets| A
+
+    classDef frontend fill:#3b82f6,stroke:#1e40af,stroke-width:2px,color:#fff
+    classDef backend fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff
+    classDef database fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff
+    classDef external fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+
+    class A,B,C,D frontend;
+    class E,F,I backend;
+    class G,H,J,K database;
+    class L,M external; 
