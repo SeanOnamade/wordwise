@@ -10,7 +10,6 @@ let getPerformance: any;
 let trace: any;
 
 if (typeof window !== 'undefined' && isProduction) {
-  setLogLevel('debug');
   const performanceModule = require('firebase/performance');
   getPerformance = performanceModule.getPerformance;
   trace = performanceModule.trace;
@@ -32,40 +31,64 @@ let db: any = null;
 let perf: any = null;
 
 if (typeof window !== 'undefined') {
-  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-  auth = getAuth(app);
-  db = getFirestore(app);
-  
-  // Only initialize Performance in production
-  if (isProduction) {
-    perf = getPerformance(app);
-  } else {
-    console.log('🚫 Firebase Performance SDK disabled in development');
-  }
-  
-  // Enable Firestore debug logging in development
-  if (!isProduction) {
-    setLogLevel('debug');
+  try {
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    auth = getAuth(app);
+    db = getFirestore(app);
+    
+    // Only initialize Performance in production
+    if (isProduction) {
+      try {
+        perf = getPerformance(app);
+        if (!perf) {
+          console.warn('Firebase Performance initialization failed');
+        }
+      } catch (error) {
+        console.warn('Error initializing Firebase Performance:', error);
+      }
+    } else {
+      console.log('🚫 Firebase Performance SDK disabled in development');
+    }
+    
+    // Enable Firestore debug logging in development
+    if (!isProduction) {
+      setLogLevel('debug');
+    }
+  } catch (error) {
+    console.error('Error initializing Firebase:', error);
   }
 }
 
 // Enhanced performance monitoring helper
 export const createPerformanceTrace = (traceName: string) => {
-  if (perf && typeof window !== 'undefined' && isProduction) {
-    try {
-      const traceInstance = trace(perf, traceName);
-      
-      // Add custom attributes for better tracking
-      traceInstance.putAttribute('environment', process.env.NODE_ENV || 'development');
-      traceInstance.putAttribute('timestamp', Date.now().toString());
-      
-      return traceInstance;
-    } catch (error) {
-      console.warn('Failed to create performance trace:', error);
+  if (!isProduction) {
+    return null;
+  }
+  
+  if (!perf || typeof window === 'undefined' || !trace) {
+    return null;
+  }
+
+  try {
+    const traceInstance = trace(perf, traceName);
+    if (!traceInstance) {
+      console.warn('Failed to create performance trace: trace instance is null');
       return null;
     }
+    
+    // Add custom attributes for better tracking
+    try {
+      traceInstance.putAttribute('environment', process.env.NODE_ENV || 'development');
+      traceInstance.putAttribute('timestamp', Date.now().toString());
+    } catch (error) {
+      console.warn('Failed to add trace attributes:', error);
+    }
+    
+    return traceInstance;
+  } catch (error) {
+    console.warn('Failed to create performance trace:', error);
+    return null;
   }
-  return null;
 };
 
 // Performance monitoring for specific operations
