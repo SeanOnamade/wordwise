@@ -306,7 +306,7 @@ const Editor = () => {
           const suggestionId = highlight.dataset.suggestionId;
           const suggestion = suggestions.find(s => s.id === suggestionId);
           
-          if (suggestion && suggestion.replacement) {
+          if (suggestion && suggestion.replacements?.[0]) {
             // Show inline actions instead of immediately applying
             setInlineActions({
               show: true,
@@ -335,7 +335,7 @@ const Editor = () => {
             
             // Show tooltip with suggestion details
             const tooltipText = `${suggestion.type.toUpperCase()}: ${suggestion.explanation}${
-              suggestion.replacement ? `\n\nSuggested: "${suggestion.replacement}"` : ''
+              suggestion.replacements?.[0] ? `\n\nSuggested: "${suggestion.replacements[0]}"` : ''
             }\n\nClick to see options or use the suggestions panel.`;
             
             showTooltip(highlight, tooltipText, suggestionId);
@@ -398,6 +398,7 @@ const Editor = () => {
   useAutosave({
     docId: currentDoc?.id || '',
     content: currentDoc?.content || '',
+    title: currentDoc?.title || '',
     enabled: !!currentDoc?.id && !!auth?.currentUser
   });
 

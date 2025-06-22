@@ -46,7 +46,7 @@ export async function checkWithLanguageTool(text: string, lang = 'en-US') {
     matches: json.matches.length,
     suggestions: json.matches.map(m => ({
       text: m.message,
-      replacement: m.replacements[0]?.value
+      replacements: m.replacements.map(r => r.value)
     }))
   });
 
