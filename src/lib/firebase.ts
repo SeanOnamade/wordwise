@@ -10,6 +10,7 @@ let getPerformance: any;
 let trace: any;
 
 if (typeof window !== 'undefined' && isProduction) {
+  setLogLevel('debug');
   const performanceModule = require('firebase/performance');
   getPerformance = performanceModule.getPerformance;
   trace = performanceModule.trace;
