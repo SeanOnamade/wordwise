@@ -1,4 +1,5 @@
 # WordWise – Final Sprint Playbook (v1.0)
+# not too bad!
 
 > **Goal:** Achieve fully-functional MVP, pass grading rubric, and ship to production **today**.
 
