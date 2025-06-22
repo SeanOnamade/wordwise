@@ -6,7 +6,7 @@ export async function GET() {
   
   try {
     console.log('🔧 Environment check:', {
-      LT_URL: process.env.NEXT_PUBLIC_LT_URL,
+      LT_ENDPOINT: process.env.NEXT_PUBLIC_LT_ENDPOINT,
       ENV: process.env.NEXT_PUBLIC_ENV,
       DISABLE_LT: process.env.NEXT_PUBLIC_DISABLE_LT
     });
@@ -23,7 +23,7 @@ export async function GET() {
       success: true,
       matches,
       config: {
-        LT_URL: process.env.NEXT_PUBLIC_LT_URL,
+        LT_ENDPOINT: process.env.NEXT_PUBLIC_LT_ENDPOINT,
         ENV: process.env.NEXT_PUBLIC_ENV
       }
     });
@@ -34,7 +34,7 @@ export async function GET() {
         success: false, 
         error: error instanceof Error ? error.message : 'Test failed',
         config: {
-          LT_URL: process.env.NEXT_PUBLIC_LT_URL,
+          LT_ENDPOINT: process.env.NEXT_PUBLIC_LT_ENDPOINT,
           ENV: process.env.NEXT_PUBLIC_ENV
         }
       },

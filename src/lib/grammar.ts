@@ -115,7 +115,7 @@ function convertLTSuggestion(match: LTMatch, fullText: string): GrammarSuggestio
 
 export async function checkText(plainText: string, lang = 'en-US'): Promise<GrammarSuggestion[]> {
   try {
-    const ltUrl = (process.env.NEXT_PUBLIC_LT_URL || 'http://localhost:8010') + '/v2/check';
+    const ltUrl = process.env.NEXT_PUBLIC_LT_ENDPOINT ?? 'https://api.languagetool.org/v2/check';
     
     // Use the plain text directly - no HTML conversion needed
     console.log('📝 Checking text:', { length: plainText.length, preview: plainText.slice(0, 100) });

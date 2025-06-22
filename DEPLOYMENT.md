@@ -94,18 +94,17 @@ vercel --prod
 2. Add your custom domain
 3. Configure DNS records
 
-## LanguageTool Setup (Optional)
+## LanguageTool Setup
 
-For production grammar checking, set up LanguageTool server:
+WordWise uses the public LanguageTool Cloud API by default. For production deployments, you can optionally configure a custom LanguageTool endpoint:
 
-### Docker Setup
+### Environment Variable (Optional)
 ```bash
-docker run -d -p 8010:8010 erikvl87/languagetool
-```
+# Use public LanguageTool Cloud API (default)
+NEXT_PUBLIC_LT_ENDPOINT=https://api.languagetool.org/v2/check
 
-### Environment Variable
-```bash
-LANGUAGETOOL_URL=http://your-languagetool-server:8010
+# Or use your own LanguageTool server
+NEXT_PUBLIC_LT_ENDPOINT=http://your-languagetool-server:8010/v2/check
 ```
 
 ## Post-Deployment Checklist

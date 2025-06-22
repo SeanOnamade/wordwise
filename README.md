@@ -23,7 +23,6 @@ WordWise uses a modern, scalable architecture with Next.js frontend, LanguageToo
 ## Prerequisites
 
 - Node.js 18 or higher
-- Docker Desktop (for LanguageTool)
 - Firebase account
 - Git
 
@@ -36,14 +35,7 @@ WordWise uses a modern, scalable architecture with Next.js frontend, LanguageToo
    npm install
    ```
 
-2. **Set up LanguageTool (Grammar Engine)**:
-   ```bash
-   docker run -d --restart always --name languagetool -p 8010:8010 erikvl87/languagetool
-   ```
-   
-   This starts LanguageTool on http://localhost:8010. The app automatically falls back to GPT-4 if LanguageTool is unavailable.
-
-3. **Configure Firebase**:
+2. **Configure Firebase**:
    - Create a Firebase project at https://console.firebase.google.com
    - Enable Authentication (Email Link sign-in)
    - Enable Firestore Database
@@ -60,9 +52,12 @@ WordWise uses a modern, scalable architecture with Next.js frontend, LanguageToo
    # Firebase Admin (for server-side operations)
    FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
    FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
+   
+   # LanguageTool Cloud API (optional - defaults to public endpoint)
+   NEXT_PUBLIC_LT_ENDPOINT=https://api.languagetool.org/v2/check
    ```
 
-4. **Launch the App**:
+3. **Launch the App**:
    ```bash
    npm run dev
    ```
@@ -269,4 +264,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ for writers worldwide** | [Live Demo](https://wordwise.vercel.app) | [Documentation](docs/) | [Report Issues](https://github.com/yourusername/wordwise/issues) 
+**Built with ❤️ for writers worldwide** | [Live Demo](https://wordwise.vercel.app) | [Documentation](docs/) | [Report Issues](https://github.com/yourusername/wordwise/issues)

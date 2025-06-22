@@ -1,5 +1,6 @@
 const LT_ENDPOINT =
-  (process.env.NEXT_PUBLIC_LT_URL || 'http://localhost:8010') + '/v2/check';
+  process.env.NEXT_PUBLIC_LT_ENDPOINT ??
+  'https://api.languagetool.org/v2/check';
 
 export interface LTMatch {
   message: string;

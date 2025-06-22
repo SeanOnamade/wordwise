@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const LANGUAGE_TOOL_URL = (process.env.NEXT_PUBLIC_LT_URL || 'http://localhost:8010') + '/v2/check';
+const LANGUAGE_TOOL_URL = process.env.NEXT_PUBLIC_LT_ENDPOINT ?? 'https://api.languagetool.org/v2/check';
 
 // Helper function to preserve case when making replacements
 const preserveCase = (original: string, replacement: string): string => {
