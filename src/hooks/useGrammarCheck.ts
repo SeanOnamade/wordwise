@@ -1,17 +1,7 @@
 import { useCallback, useState } from 'react';
-import { useEditorStore } from '@/store/editorStore';
+import { useEditorStore, Suggestion } from '@/store/editorStore';
 import { checkWithLanguageTool } from '@/lib/languageTool';
 import debounce from 'lodash/debounce';
-
-export interface Suggestion {
-  id: string;
-  start: number;
-  end: number;
-  replacement: string;
-  type: string;
-  rule: string;
-  message: string;
-}
 
 export function useGrammarCheck() {
   const { addSuggestion, clearSuggestions } = useEditorStore();
@@ -38,12 +28,14 @@ export function useGrammarCheck() {
         // Map LT matches to our suggestion format
         const suggestions: Suggestion[] = matches.map(m => ({
           id: crypto.randomUUID(),
-          start: m.offset,
-          end: m.offset + m.length,
-          replacement: m.replacements[0]?.value ?? '',
-          type: m.rule.category.name.toLowerCase(),
-          rule: m.rule.id,
-          message: m.message
+          type: (m.rule.category.name.toLowerCase() === 'grammar' ? 'grammar' :
+                m.rule.category.name.toLowerCase() === 'style' ? 'style' : 'spelling') as 'grammar' | 'style' | 'spelling',
+          ruleKey: m.rule.id,
+          original: currentText.slice(m.offset, m.offset + m.length),
+          replacements: m.replacements.map(r => r.value),
+          explanation: m.message,
+          range: { from: m.offset, to: m.offset + m.length },
+          status: 'new'
         }));
 
         // Add each suggestion to the store

@@ -29,11 +29,12 @@ const preserveCase = (original: string, replacement: string): string => {
 const generateMockSuggestions = (text: string) => {
   const suggestions: Array<{
     range: { from: number; to: number };
-    type: string;
+    type: 'spelling' | 'grammar' | 'style';
     original: string;
-    replacement: string;
+    replacements: string[];
     ruleKey: string;
     explanation: string;
+    status: 'new' | 'applied' | 'dismissed';
   }> = [];
   
   // Comprehensive grammar rules for ESL students - targeting 85%+ accuracy
@@ -385,7 +386,7 @@ const generateMockSuggestions = (text: string) => {
     let match;
     rule.pattern.lastIndex = 0; // Reset regex state
     while ((match = rule.pattern.exec(text)) !== null) {
-      const rawReplacement = rule.replacement.replace(/\$1/g, match[1] || '').replace(/\$2/g, match[2] || '');
+      const newText = rule.replacement.replace(/\$1/g, match[1] || '').replace(/\$2/g, match[2] || '');
       
       // Special cases that should not preserve case (use replacement as-is)
       const forceOriginalCase = ['CAPITALIZE_I']; // "i" should always become "I" regardless of context
@@ -405,11 +406,12 @@ const generateMockSuggestions = (text: string) => {
           from: match.index + wordStart + 1 - listOffset,
           to: match.index + wordEnd + 1 - listOffset,
         },
-        type: rule.type,
+        type: rule.type as 'spelling' | 'grammar' | 'style',
         original: text.slice(wordStart, wordEnd),
-        replacement: forceOriginalCase.includes(rule.rule) ? rawReplacement : preserveCase(text.slice(wordStart, wordEnd), rawReplacement),
+        replacements: [forceOriginalCase.includes(rule.rule) ? newText : preserveCase(text.slice(wordStart, wordEnd), newText)],
         ruleKey: rule.rule,
         explanation: rule.message,
+        status: 'new' as const
       };
       console.log('Found grammar issue:', suggestion); // Debug log
       suggestions.push(suggestion);
