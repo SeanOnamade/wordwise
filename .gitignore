@@ -138,7 +138,13 @@ dist
 
 # Gatsby files
 .cache/
-public
+public/*
+!.keep
+
+# ignores everything in public except .keep
+
+!public/architecture.png
+
 
 # Storybook build outputs
 .out

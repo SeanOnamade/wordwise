@@ -4,14 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run diagram && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "diagram": "mmdc -i docs/architecture.mmd -o public/architecture.png -t dark --width 1200 --height 800"
+    "diagram": "mmdc -i docs/architecture.mmd -o public/architecture.png -t dark --width 1200 --height 800",
+    "postinstall": "if [ \"$CI\" != \"true\" ]; then npm run diagram; fi"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
