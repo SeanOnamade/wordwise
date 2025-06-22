@@ -14,6 +14,7 @@ import { Suggestion, useEditorStore } from '@/store/editorStore';
 import { checkText } from '@/lib/grammar';
 import debounce from 'lodash/debounce';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import Placeholder from '@tiptap/extension-placeholder';
 
 // Plugin key for suggestion highlights
 const suggestionHighlightKey = new PluginKey('suggestionHighlight');
@@ -272,6 +273,9 @@ export default function TipTapEditor({
     }),
     KeyboardShortcutExtension,
     SuggestionHighlightExtension,
+    Placeholder.configure({
+      placeholder: 'Start writing your masterpiece...',
+    }),
   ], []); // Empty dependency array - these never change
   
   // Performance-optimized update handler

@@ -38,6 +38,7 @@ interface EditorState {
   addDocument: (doc: Document) => void;
   updateDocument: (doc: Document) => void;
   removeDocument: (docId: string) => void;
+  createNewDocument: () => Document;
   setWordCount: (count: number) => void;
   updatePerformanceMetrics: (responseTime: number) => void;
   clearSuggestions: () => void;
@@ -95,8 +96,27 @@ export const useEditorStore = create<EditorState>((set) => ({
   removeDocument: (docId) =>
     set((state) => ({
       documents: state.documents.filter((d) => d.id !== docId),
-      currentDoc: state.currentDoc?.id === docId ? null : state.currentDoc
+      currentDoc: state.currentDoc?.id === docId ? null : state.currentDoc,
     })),
+  createNewDocument: () => {
+    const creationDate = new Date();
+    const newDoc: Document = {
+      id: crypto.randomUUID(),
+      title: 'Untitled Document',
+      content: '',
+      lastModified: creationDate,
+      createdAt: creationDate,
+    };
+    
+    console.log('📝 Creating new document in store:', newDoc.id);
+    
+    set((state) => ({
+      documents: [newDoc, ...(state.documents || [])],
+      currentDoc: newDoc,
+    }));
+    
+    return newDoc;
+  },
   setWordCount: (count) => set({ wordCount: count }),
   updatePerformanceMetrics: (responseTime) =>
     set((state) => ({

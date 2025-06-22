@@ -11,6 +11,7 @@ import TipTapEditor from './components/TipTapEditor';
 import { useAutosave } from '@/hooks/useAutosave';
 import CopyHTMLButton from '@/components/ShareButton';
 import ExportButton from '@/components/ExportButton';
+import { checkText } from '@/lib/grammar';
 
 interface EditorShellProps {
   user: any;
@@ -92,7 +93,34 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
     // Calculate word count
     const words = text.trim().split(/\s+/).filter(word => word.length > 0);
     setWordCount(words.length);
+
+    // Debounced grammar check
+    const check = async () => {
+      if (!editorInstance) return;
+      
+      const plainText = editorInstance.getText();
+      if (plainText.trim().length < 10) {
+        clearSuggestions();
+        return;
+      }
+      
+      setIsGrammarChecking(true);
+      const suggestions = await checkText(plainText);
+      useEditorStore.setState({ suggestions });
+      setIsGrammarChecking(false);
+    };
+
+    check();
   };
+
+  const handleGrammarCheck = useCallback(async () => {
+    if (!editorInstance) return;
+    setIsGrammarChecking(true);
+    const text = editorInstance.getText();
+    const newSuggestions = await checkText(text);
+    useEditorStore.setState({ suggestions: newSuggestions });
+    setIsGrammarChecking(false);
+  }, [editorInstance]);
 
   const handleTitleChange = (title: string) => {
     if (currentDoc) {
@@ -119,6 +147,23 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
     
     return date.toLocaleDateString();
   };
+
+  if (!currentDoc) {
+    return (
+      <div className="h-screen flex">
+        <Sidebar />
+        <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-white">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold mb-2">Welcome to WordWise</h2>
+            <p className="text-slate-400 mb-6">Create a new document to get started.</p>
+            <Button onClick={useEditorStore.getState().createNewDocument} size="lg">
+              Start Writing
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex">
@@ -187,6 +232,14 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
             </div>
             
             <div className="flex items-center space-x-2">
+              <Button
+                onClick={handleGrammarCheck}
+                disabled={isGrammarChecking}
+                variant="outline"
+                className="text-slate-300 hover:text-white border-slate-500 hover:border-slate-400"
+              >
+                {isGrammarChecking ? 'Checking...' : 'Check Grammar'}
+              </Button>
               <CopyHTMLButton 
                 editor={editorInstance} 
                 className="text-black"

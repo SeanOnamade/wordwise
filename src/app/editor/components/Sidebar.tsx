@@ -14,7 +14,7 @@ interface Document {
 }
 
 export default function Sidebar() {
-  const { currentDoc, setCurrentDoc, documents, setDocuments, removeDocument } = useEditorStore();
+  const { currentDoc, setCurrentDoc, documents, setDocuments, removeDocument, createNewDocument } = useEditorStore();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
@@ -183,26 +183,6 @@ export default function Sidebar() {
     } catch (error) {
       console.error('📚 Error loading document:', error);
     }
-  };
-
-  const createNewDocument = () => {
-    if (!auth?.currentUser) {
-      console.log('📝 Cannot create document - no authenticated user');
-      return;
-    }
-
-    const creationDate = new Date();
-    const newDoc: Document = {
-      id: crypto.randomUUID(),
-      title: 'Untitled Document',
-      content: '',
-      lastModified: creationDate,
-      createdAt: creationDate,
-    };
-
-    console.log('📝 Creating new document locally:', newDoc.id);
-    setDocuments([newDoc, ...(documents || [])]);
-    setCurrentDoc(newDoc);
   };
 
   return (
