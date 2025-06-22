@@ -1,17 +1,34 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
-// Function to format the private key from environment variables
-const formatPrivateKey = (key?: string): string => {
-  if (!key) return '';
-  return key.replace(/\\n/g, '\n');
+// Function to get the private key, preferring a base64 version
+const getPrivateKey = (): string => {
+  const b64Key = process.env.FIREBASE_ADMIN_PRIVATE_KEY_B64;
+  const directKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+
+  // Prefer the base64 encoded key for production environments
+  if (b64Key) {
+    try {
+      return Buffer.from(b64Key, 'base64').toString('utf8');
+    } catch (error) {
+      console.error('Failed to decode Base64 private key:', error);
+      // Fallback to direct key if decoding fails
+    }
+  }
+
+  // Fallback for local development or if base64 key is missing
+  if (directKey) {
+    return directKey.replace(/\\n/g, '\n');
+  }
+
+  return '';
 };
 
 let adminDb: ReturnType<typeof getFirestore> | null = null;
 
 const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-const privateKey = formatPrivateKey(process.env.FIREBASE_ADMIN_PRIVATE_KEY);
+const privateKey = getPrivateKey();
 
 if (projectId && clientEmail && privateKey) {
   const existingApp = getApps().find(app => app.name === 'admin');
