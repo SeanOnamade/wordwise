@@ -28,7 +28,7 @@ interface LTResponse {
 
 interface GrammarSuggestion {
   id: string;
-  type: 'spelling' | 'grammar' | 'style';
+  type: 'spelling' | 'grammar' | 'style' | 'smart';
   ruleKey: string;
   original: string;
   replacements: string[];

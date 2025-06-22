@@ -4,7 +4,7 @@ import { SmartReview, SmartReviewState } from '@/types/SmartReview';
 
 export type Suggestion = {
   id: string;
-  type: 'spelling' | 'grammar' | 'style';
+  type: 'spelling' | 'grammar' | 'style' | 'smart';
   ruleKey: string;
   original: string;
   replacements: string[];
@@ -23,6 +23,10 @@ interface Document {
 
 interface EditorState {
   editor: Editor | null;
+  // Separated suggestion types
+  grammarSuggestions: Suggestion[];
+  smartReviewSuggestions: Suggestion[];
+  // Legacy suggestions property for backward compatibility
   suggestions: Suggestion[];
   wordCount: number;
   performanceMetrics: {
@@ -33,6 +37,18 @@ interface EditorState {
   documents: Document[];
   smartReview: SmartReviewState;
   setEditor: (editor: Editor | null) => void;
+  // Grammar suggestion methods
+  addGrammarSuggestion: (suggestion: Suggestion) => void;
+  updateGrammarSuggestionStatus: (id: string, status: 'applied' | 'dismissed') => void;
+  clearGrammarSuggestions: () => void;
+  updateGrammarSuggestions: (suggestions: Suggestion[]) => void;
+  updateGrammarSuggestionRanges: (appliedFrom: number, lengthDiff: number, appliedSuggestionId: string) => void;
+  // Smart review suggestion methods
+  addSmartReviewSuggestion: (suggestion: Suggestion) => void;
+  updateSmartReviewSuggestionStatus: (id: string, status: 'applied' | 'dismissed') => void;
+  clearSmartReviewSuggestions: () => void;
+  updateSmartReviewSuggestionRanges: (appliedFrom: number, lengthDiff: number, appliedSuggestionId: string) => void;
+  // Legacy methods for backward compatibility
   addSuggestion: (suggestion: Suggestion) => void;
   updateSuggestionStatus: (id: string, status: 'applied' | 'dismissed') => void;
   setCurrentDoc: (doc: Document | null) => void;
@@ -49,11 +65,18 @@ interface EditorState {
   closeSmartReview: () => void;
   setSmartReviewLoading: (loading: boolean) => void;
   setSmartReviewError: (error: string | undefined) => void;
+  updateSmartReviewIssueStatus: (issueId: string, status: 'applied' | 'dismissed') => void;
+  updateSuggestions: (suggestions: Suggestion[]) => void;
+  // Combined getters
+  getAllSuggestions: () => Suggestion[];
+  getActiveSuggestions: () => Suggestion[];
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   editor: null,
-  suggestions: [],
+  grammarSuggestions: [],
+  smartReviewSuggestions: [],
+  suggestions: [], // Legacy property
   wordCount: 0,
   performanceMetrics: {
     totalChecks: 0,
@@ -68,9 +91,97 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     error: undefined,
   },
   setEditor: (editor) => set({ editor }),
+  
+  // Grammar suggestion methods
+  addGrammarSuggestion: (sug) => {
+    console.log('🟢 ADD GRAMMAR', sug.ruleKey, sug.range, sug.status);
+    set((state) => ({
+      grammarSuggestions: [
+        ...state.grammarSuggestions,
+        { ...sug, status: sug.status || 'new' },
+      ],
+    }));
+  },
+  updateGrammarSuggestionStatus: (id, status: 'applied' | 'dismissed') =>
+    set((state) => ({
+      grammarSuggestions: state.grammarSuggestions.map((s) =>
+        s.id === id ? { ...s, status } : s
+      ),
+    })),
+  clearGrammarSuggestions: () => {
+    console.log('🧹 Clearing grammar suggestions');
+    set({ grammarSuggestions: [] });
+  },
+  updateGrammarSuggestions: (suggestions) => {
+    console.log('📝 Updating grammar suggestions:', suggestions.length);
+    set(() => ({ grammarSuggestions: suggestions }));
+  },
+  updateGrammarSuggestionRanges: (appliedFrom: number, lengthDiff: number, appliedSuggestionId: string) =>
+    set((state) => ({
+      grammarSuggestions: state.grammarSuggestions.map((suggestion) => {
+        if (suggestion.id === appliedSuggestionId || suggestion.status !== 'new') {
+          return suggestion;
+        }
+        if (suggestion.range.from > appliedFrom) {
+          return {
+            ...suggestion,
+            range: {
+              from: suggestion.range.from + lengthDiff,
+              to: suggestion.range.to + lengthDiff
+            }
+          };
+        }
+        return suggestion;
+      })
+    })),
+
+  // Smart review suggestion methods
+  addSmartReviewSuggestion: (sug) => {
+    console.log('🟢 ADD SMART REVIEW', sug.ruleKey, sug.range, sug.status);
+    set((state) => ({
+      smartReviewSuggestions: [
+        ...state.smartReviewSuggestions,
+        { ...sug, status: sug.status || 'new' },
+      ],
+    }));
+  },
+  updateSmartReviewSuggestionStatus: (id, status: 'applied' | 'dismissed') =>
+    set((state) => ({
+      smartReviewSuggestions: state.smartReviewSuggestions.map((s) =>
+        s.id === id ? { ...s, status } : s
+      ),
+    })),
+  clearSmartReviewSuggestions: () => {
+    console.log('🧹 Clearing smart review suggestions');
+    set({ smartReviewSuggestions: [] });
+  },
+  updateSmartReviewSuggestionRanges: (appliedFrom: number, lengthDiff: number, appliedSuggestionId: string) =>
+    set((state) => ({
+      smartReviewSuggestions: state.smartReviewSuggestions.map((suggestion) => {
+        if (suggestion.id === appliedSuggestionId || suggestion.status !== 'new') {
+          return suggestion;
+        }
+        if (suggestion.range.from > appliedFrom) {
+          return {
+            ...suggestion,
+            range: {
+              from: suggestion.range.from + lengthDiff,
+              to: suggestion.range.to + lengthDiff
+            }
+          };
+        }
+        return suggestion;
+      })
+    })),
+
+  // Legacy methods for backward compatibility
   addSuggestion: (sug) => {
-    // TEMP LOG – remove after working
-    console.log('🟢 ADD', sug.ruleKey, sug.range, sug.status);
+    if (sug.type === 'smart') {
+      get().addSmartReviewSuggestion(sug);
+    } else {
+      get().addGrammarSuggestion(sug);
+    }
+    // Also update legacy suggestions array
     set((state) => ({
       suggestions: [
         ...state.suggestions,
@@ -78,12 +189,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ],
     }));
   },
-  updateSuggestionStatus: (id, status: 'applied' | 'dismissed') =>
+  updateSuggestionStatus: (id, status: 'applied' | 'dismissed') => {
+    const state = get();
+    const grammarSug = state.grammarSuggestions.find(s => s.id === id);
+    const smartSug = state.smartReviewSuggestions.find(s => s.id === id);
+    
+    if (grammarSug) {
+      get().updateGrammarSuggestionStatus(id, status);
+    }
+    if (smartSug) {
+      get().updateSmartReviewSuggestionStatus(id, status);
+    }
+    
+    // Also update legacy suggestions array
     set((state) => ({
       suggestions: state.suggestions.map((s) =>
         s.id === id ? { ...s, status } : s
       ),
-    })),
+    }));
+  },
+
+  // Combined getters
+  getAllSuggestions: () => {
+    const state = get();
+    return [...state.grammarSuggestions, ...state.smartReviewSuggestions];
+  },
+  getActiveSuggestions: () => {
+    const state = get();
+    const activeGrammar = state.grammarSuggestions.filter(s => s.status === 'new');
+    const activeSmart = state.smartReviewSuggestions.filter(s => s.status === 'new');
+    return [...activeGrammar, ...activeSmart];
+  },
+
   setCurrentDoc: (doc) => {
     console.log('📝 Updating document in store:', {
       id: doc?.id,
@@ -97,7 +234,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addDocument: (doc) => 
     set((state) => ({
       documents: [doc, ...state.documents],
-      currentDoc: doc // Automatically set as current doc
+      currentDoc: doc
     })),
   updateDocument: (doc) =>
     set((state) => ({
@@ -138,24 +275,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         lastResponseTime: responseTime,
       },
     })),
-  clearSuggestions: () => set({ suggestions: [] }),
-  updateSuggestionRanges: (appliedFrom: number, lengthDiff: number, appliedSuggestionId: string) =>
+  clearSuggestions: () => {
+    set({ 
+      suggestions: [],
+      grammarSuggestions: [],
+      smartReviewSuggestions: []
+    });
+  },
+  updateSuggestionRanges: (appliedFrom: number, lengthDiff: number, appliedSuggestionId: string) => {
+    get().updateGrammarSuggestionRanges(appliedFrom, lengthDiff, appliedSuggestionId);
+    get().updateSmartReviewSuggestionRanges(appliedFrom, lengthDiff, appliedSuggestionId);
+    
+    // Also update legacy suggestions array
     set((state) => ({
       suggestions: state.suggestions.map((suggestion) => {
-        // Skip the applied suggestion and already processed suggestions
         if (suggestion.id === appliedSuggestionId || suggestion.status !== 'new') {
           return suggestion;
         }
-        
-        // Only update suggestions that come after the applied position
         if (suggestion.range.from > appliedFrom) {
-          console.log('📐 Updating suggestion range:', {
-            id: suggestion.id,
-            original: suggestion.original,
-            oldRange: { from: suggestion.range.from, to: suggestion.range.to },
-            lengthDiff
-          });
-          
           return {
             ...suggestion,
             range: {
@@ -164,17 +301,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             }
           };
         }
-        
         return suggestion;
       })
-    })),
+    }));
+  },
   runSmartReview: async (content: string) => {
+    console.log('🔄 Starting Smart Review...');
+    
     set((state) => ({
       smartReview: {
         ...state.smartReview,
         loading: true,
         error: undefined,
         isOpen: true,
+        data: null,
       },
     }));
 
@@ -187,28 +327,44 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         body: JSON.stringify({ content }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error(`Smart Review API error: ${response.status}`);
+        throw new Error(data.error || `Smart Review API error: ${response.status}`);
       }
 
-      const smartReviewData: SmartReview = await response.json();
+      if (!data || !data.metrics || !data.issues || !data.suggestions) {
+        console.error('Invalid Smart Review response:', data);
+        throw new Error('Invalid response from Smart Review API');
+      }
+
+      console.log('✅ Smart Review data received:', {
+        metrics: Object.keys(data.metrics),
+        issueCount: data.issues.length,
+        suggestionCount: data.suggestions.length
+      });
 
       set((state) => ({
         smartReview: {
           ...state.smartReview,
-          data: smartReviewData,
+          data: data,
           loading: false,
+          error: undefined,
+          isOpen: true,
         },
       }));
     } catch (error) {
-      console.error('Smart Review error:', error);
+      console.error('❌ Smart Review error:', error);
       set((state) => ({
         smartReview: {
           ...state.smartReview,
+          data: null,
           loading: false,
           error: error instanceof Error ? error.message : 'Failed to generate smart review',
+          isOpen: true,
         },
       }));
+      throw error;
     }
   },
   closeSmartReview: () =>
@@ -232,4 +388,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         error,
       },
     })),
+  updateSmartReviewIssueStatus: (issueId: string, status: 'applied' | 'dismissed') =>
+    set((state) => ({
+      smartReview: {
+        ...state.smartReview,
+        data: state.smartReview.data ? {
+          ...state.smartReview.data,
+          issues: state.smartReview.data.issues.map(issue =>
+            issue.id === issueId ? { ...issue, status } : issue
+          )
+        } : null
+      }
+    })),
+  updateSuggestions: (suggestions) => {
+    // Split suggestions by type
+    const grammarSugs = suggestions.filter(s => s.type !== 'smart');
+    const smartSugs = suggestions.filter(s => s.type === 'smart');
+    
+    console.log('📝 Updating suggestions (split):', {
+      grammar: grammarSugs.length,
+      smart: smartSugs.length,
+      total: suggestions.length
+    });
+    
+    set(() => ({
+      suggestions, // Legacy
+      grammarSuggestions: grammarSugs,
+      smartReviewSuggestions: smartSugs
+    }));
+  },
 })); 

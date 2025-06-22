@@ -1,11 +1,18 @@
 export interface SmartReviewMetric {
   score: number;
-  comment: string;
+  explanation: string;
 }
 
 export interface SmartReviewIssue {
+  id: string;
   excerpt: string;
   explanation: string;
+  suggestions: string[];
+  range?: {
+    from: number;
+    to: number;
+  };
+  status: 'new' | 'applied' | 'dismissed';
 }
 
 export interface SmartReview {

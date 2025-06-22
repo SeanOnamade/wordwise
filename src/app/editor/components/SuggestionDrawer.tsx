@@ -12,14 +12,17 @@ interface SuggestionDrawerProps {
 }
 
 export default function SuggestionDrawer({ editor, isLoading = false, onSuggestionApplied }: SuggestionDrawerProps) {
-  const { suggestions, updateSuggestionStatus } = useEditorStore();
+  const { updateSuggestionStatus, getActiveSuggestions } = useEditorStore();
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
+  
+  // Get all active suggestions from both grammar and smart review systems
+  const allSuggestions = getActiveSuggestions();
   
   // Filter and sort suggestions
   const visible = useMemo(() => {
     // Remove duplicates by keeping first occurrence of each id
-    const uniqueSuggestions = suggestions.reduce<Suggestion[]>((acc, curr) => {
+    const uniqueSuggestions = allSuggestions.reduce<Suggestion[]>((acc, curr) => {
       if (!acc.some(s => s.id === curr.id)) {
         acc.push(curr);
       }
@@ -43,16 +46,16 @@ export default function SuggestionDrawer({ editor, isLoading = false, onSuggesti
       });
 
     // Debug log
-    console.log('📑 SORTED', sorted.map(s => [s.ruleKey, s.range.from]));
+    console.log('📑 SORTED combined suggestions:', sorted.map(s => [s.type, s.ruleKey, s.range.from]));
 
     return sorted;
-  }, [suggestions]);
+  }, [allSuggestions]);
 
   const handleApplySuggestion = async (suggestionId: string, replacement: string) => {
     setApplyingId(suggestionId);
     
     try {
-      const suggestion = suggestions.find(s => s.id === suggestionId);
+      const suggestion = allSuggestions.find(s => s.id === suggestionId);
       
       if (suggestion && editor) {
         const { from, to } = suggestion.range;
@@ -62,6 +65,7 @@ export default function SuggestionDrawer({ editor, isLoading = false, onSuggesti
 
         console.log('🔄 Applying suggestion from drawer:', {
           suggestionId,
+          type: suggestion.type,
           original: suggestion.original,
           replacement,
           range: { from, to },
@@ -86,14 +90,15 @@ export default function SuggestionDrawer({ editor, isLoading = false, onSuggesti
           updateSuggestionRanges(from, lengthDiff, suggestionId);
         }
         
-        // Force refresh of decorations to remove highlights and realign
+        // Force refresh of decorations for both systems
         setTimeout(() => {
           const { view } = editor;
           const tr = view.state.tr;
-          tr.setMeta('suggestionsChanged', true);
+          tr.setMeta('grammarSuggestionsChanged', true);
+          tr.setMeta('smartReviewSuggestionsChanged', true);
           tr.setMeta('forceUpdate', true);
           view.dispatch(tr);
-        }, 50); // Reduced timeout for faster refresh
+        }, 50);
 
         // Trigger immediate autosave after suggestion application
         if (onSuggestionApplied) {
@@ -114,12 +119,13 @@ export default function SuggestionDrawer({ editor, isLoading = false, onSuggesti
     try {
       updateSuggestionStatus(suggestionId, 'dismissed');
       
-      // Force refresh of decorations to remove highlights and realign
+      // Force refresh of decorations for both systems
       if (editor) {
         setTimeout(() => {
           const { view } = editor;
           const tr = view.state.tr;
-          tr.setMeta('suggestionsChanged', true);
+          tr.setMeta('grammarSuggestionsChanged', true);
+          tr.setMeta('smartReviewSuggestionsChanged', true);
           tr.setMeta('forceUpdate', true);
           view.dispatch(tr);
         }, 100);

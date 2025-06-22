@@ -188,7 +188,7 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
             <div className="flex items-center space-x-4 mt-1">
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-slate-400">
-                  {isSaving ? 'Saving...' : lastSaved ? `Last saved ${formatLastUpdated(lastSaved)}` : 'Not saved yet'}
+                  {isSaving ? 'Saving...' : lastSaved ? `Last saved: ${formatLastUpdated(lastSaved)}` : 'Not saved yet'}
                 </span>
                 {isSaving && (
                   <svg className="animate-spin h-4 w-4 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -287,7 +287,10 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
           {/* Right Sidebar - Smart Review or Suggestions */}
           <div className="w-80 border-l border-white/10">
             {smartReview.isOpen ? (
-              <SmartReviewDrawer />
+              <SmartReviewDrawer 
+                editor={editorInstance}
+                onClose={() => useEditorStore.getState().closeSmartReview()}
+              />
             ) : (
               <SuggestionDrawer 
                 editor={editorInstance} 

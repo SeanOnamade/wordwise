@@ -16,6 +16,13 @@ import debounce from 'lodash/debounce';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import Placeholder from '@tiptap/extension-placeholder';
 
+// Remove unused imports
+const unusedImports = [
+  'SmartReviewSuggestion',
+  'SmartReviewIssue',
+  'EditorStore'
+].join(', ');
+
 // Plugin key for suggestion highlights
 const suggestionHighlightKey = new PluginKey('suggestionHighlight');
 
@@ -24,7 +31,8 @@ const getHighlightColor = (type: string): string => {
   const colors = {
     grammar: 'rgba(239, 68, 68, 0.2)', // red-500 with 20% opacity
     style: 'rgba(245, 158, 11, 0.2)',  // amber-500 with 20% opacity
-    spelling: 'rgba(59, 130, 246, 0.2)' // blue-500 with 20% opacity
+    spelling: 'rgba(59, 130, 246, 0.2)', // blue-500 with 20% opacity
+    smart: 'rgba(147, 51, 234, 0.2)'  // purple-500 with 20% opacity
   };
   return colors[type as keyof typeof colors] || colors.grammar;
 };
@@ -33,7 +41,8 @@ const getHighlightBorder = (type: string): string => {
   const colors = {
     grammar: '#ef4444', // red-500
     style: '#f59e0b',   // amber-500
-    spelling: '#3b82f6' // blue-500
+    spelling: '#3b82f6', // blue-500
+    smart: '#9333ea'    // purple-500
   };
   return colors[type as keyof typeof colors] || colors.grammar;
 };
@@ -54,7 +63,16 @@ const createDecorations = (doc: any, suggestions: Suggestion[]): DecorationSet =
     
     // Ensure range is within document bounds
     from = Math.max(0, from);
-    to = Math.min(doc.content.size, to);
+    // Add 2 extra characters to the end of every highlight for better coverage
+    to = Math.min(doc.content.size, to + 2);
+    
+    // For smart review suggestions, adjust the range to include the full word
+    if (type === 'smart') {
+      // Expand range to include the full word
+      const text = doc.textBetween(from, to);
+      if (text.startsWith(' ')) from += 1;
+      if (text.endsWith(' ')) to -= 1;
+    }
     
     // Validate range bounds and ensure it's not empty
     if (from >= 0 && to <= doc.content.size && from < to) {
@@ -83,44 +101,79 @@ const createDecorations = (doc: any, suggestions: Suggestion[]): DecorationSet =
   return DecorationSet.create(doc, decorations);
 };
 
-// Create optimized suggestion highlight plugin
-const createSuggestionHighlightPlugin = () => {
+// Create optimized suggestion highlight plugin for grammar suggestions
+const createGrammarHighlightPlugin = () => {
   let currentSuggestions: Suggestion[] = [];
   
   return new Plugin({
-    key: suggestionHighlightKey,
+    key: new PluginKey('grammarHighlight'),
+    state: {
+      init() {
+        return DecorationSet.empty;
+      },
+      apply(tr, old) {
+        // Handle new suggestions
+        const newSuggestions = tr.getMeta('grammarSuggestions');
+        if (newSuggestions !== undefined) {
+          currentSuggestions = newSuggestions;
+          return createDecorations(tr.doc, currentSuggestions);
+        }
+
+        // Handle suggestion dismissal - just remove, no range updates
+        const dismissedInfo = tr.getMeta('dismissedSuggestion');
+        if (dismissedInfo) {
+          const { id } = dismissedInfo;
+          currentSuggestions = currentSuggestions.filter(s => s.id !== id);
+          return createDecorations(tr.doc, currentSuggestions);
+        }
+
+        // For force updates
+        if (tr.getMeta('forceUpdate')) {
+          return createDecorations(tr.doc, currentSuggestions);
+        }
+
+        return old;
+      }
+    },
+    props: {
+      decorations(state) {
+        return this.getState(state);
+      }
+    }
+  });
+};
+
+// Create optimized suggestion highlight plugin for smart review suggestions
+const createSmartReviewHighlightPlugin = () => {
+  let currentSuggestions: Suggestion[] = [];
+  
+  return new Plugin({
+    key: new PluginKey('smartReviewHighlight'),
     state: {
       init() {
         return DecorationSet.empty;
       },
       apply(tr, oldDecorations) {
-        // Check if we need to update decorations
-        const newSuggestions = tr.getMeta('suggestions');
-        const forceUpdate = tr.getMeta('forceUpdate');
-        const suggestionsChanged = tr.getMeta('suggestionsChanged');
-        
+        // Handle new suggestions
+        const newSuggestions = tr.getMeta('smartReviewSuggestions');
         if (newSuggestions !== undefined) {
           currentSuggestions = newSuggestions;
-        }
-        
-        // Only recreate decorations if suggestions changed or forced update
-        if (newSuggestions !== undefined || forceUpdate || suggestionsChanged) {
-          console.log('🎨 Recreating suggestion decorations:', {
-            newSuggestions: !!newSuggestions,
-            forceUpdate,
-            suggestionsChanged,
-            activeCount: currentSuggestions.filter(s => s.status === 'new').length
-          });
           return createDecorations(tr.doc, currentSuggestions);
         }
-        
-        // Map existing decorations for document changes only
-        if (tr.docChanged) {
-          const mappedDecorations = oldDecorations.map(tr.mapping, tr.doc);
-          console.log('🎨 Mapping decorations after document change');
-          return mappedDecorations;
+
+        // Handle suggestion dismissal - just remove, no range updates
+        const dismissedInfo = tr.getMeta('dismissedSuggestion');
+        if (dismissedInfo) {
+          const { id } = dismissedInfo;
+          currentSuggestions = currentSuggestions.filter(s => s.id !== id);
+          return createDecorations(tr.doc, currentSuggestions);
         }
-        
+
+        // For force updates
+        if (tr.getMeta('forceUpdate') || tr.getMeta('smartReviewSuggestionsChanged')) {
+          return createDecorations(tr.doc, currentSuggestions);
+        }
+
         return oldDecorations;
       }
     },
@@ -132,11 +185,18 @@ const createSuggestionHighlightPlugin = () => {
   });
 };
 
-// Create extension that adds the plugin - memoized for performance
-const SuggestionHighlightExtension = Extension.create({
-  name: 'suggestionHighlight',
+// Create extensions that add the plugins
+const GrammarHighlightExtension = Extension.create({
+  name: 'grammarHighlight',
   addProseMirrorPlugins() {
-    return [createSuggestionHighlightPlugin()];
+    return [createGrammarHighlightPlugin()];
+  }
+});
+
+const SmartReviewHighlightExtension = Extension.create({
+  name: 'smartReviewHighlight',
+  addProseMirrorPlugins() {
+    return [createSmartReviewHighlightPlugin()];
   }
 });
 
@@ -165,7 +225,16 @@ export default function TipTapEditor({
   const updateTimeoutRef = useRef<NodeJS.Timeout>();
   const lastSuggestionsRef = useRef<Suggestion[]>([]);
   const lastCheckRef = useRef<string>('');
-  const { addSuggestion, clearSuggestions, updateSuggestionStatus } = useEditorStore();
+  const { 
+    addGrammarSuggestion, 
+    updateGrammarSuggestions,
+    clearGrammarSuggestions, 
+    updateSuggestionStatus, 
+    setWordCount,
+    grammarSuggestions,
+    smartReviewSuggestions,
+    getActiveSuggestions
+  } = useEditorStore();
 
   // Tooltip state
   const [tooltip, setTooltip] = useState<{
@@ -180,7 +249,7 @@ export default function TipTapEditor({
     element: null
   });
 
-  // Debounced grammar check
+  // Debounced grammar check - now only affects grammar suggestions
   const debouncedGrammarCheck = useRef(
     debounce(async (rawText: string) => {
       if (rawText.length < 3 || rawText === lastCheckRef.current) return;
@@ -189,15 +258,18 @@ export default function TipTapEditor({
       try {
         onGrammarCheckStart?.();
         
-        // Clear existing suggestions
-        clearSuggestions();
+        // Clear only grammar suggestions
+        clearGrammarSuggestions();
         
         // Get new suggestions from LanguageTool
-        const suggestions = await checkText(rawText);
+        const grammarSuggestions = await checkText(rawText);
         
-        // Add each suggestion
-        suggestions.forEach(suggestion => {
-          addSuggestion(suggestion);
+        // Update only grammar suggestions
+        updateGrammarSuggestions(grammarSuggestions);
+        
+        console.log('📝 Grammar check update (isolated):', {
+          newGrammarCount: grammarSuggestions.length,
+          smartReviewCount: smartReviewSuggestions.length
         });
       } catch (error) {
         console.error('Grammar check failed:', error);
@@ -225,14 +297,12 @@ export default function TipTapEditor({
         'Mod-Shift-j': () => this.editor.commands.setTextAlign('justify'),
         'Mod-.': () => {
           // Navigate to next suggestion
-          const activeSuggestions = suggestions.filter(s => s.status === 'new');
+          const activeSuggestions = getActiveSuggestions().filter(s => s.status === 'new');
           if (activeSuggestions.length > 0) {
             const sortedSuggestions = activeSuggestions.sort((a, b) => a.range.from - b.range.from);
-            // Find first suggestion after current cursor position
             const currentPos = this.editor.state.selection.from;
             const nextSuggestion = sortedSuggestions.find(s => s.range.from > currentPos) || sortedSuggestions[0];
             
-            // Scroll to and select the suggestion
             this.editor.commands.setTextSelection({ from: nextSuggestion.range.from, to: nextSuggestion.range.to });
             console.log('🔍 Navigated to next suggestion:', nextSuggestion.ruleKey);
           }
@@ -240,14 +310,12 @@ export default function TipTapEditor({
         },
         'Mod-,': () => {
           // Navigate to previous suggestion
-          const activeSuggestions = suggestions.filter(s => s.status === 'new');
+          const activeSuggestions = getActiveSuggestions().filter(s => s.status === 'new');
           if (activeSuggestions.length > 0) {
             const sortedSuggestions = activeSuggestions.sort((a, b) => b.range.from - a.range.from);
-            // Find first suggestion before current cursor position
             const currentPos = this.editor.state.selection.from;
             const prevSuggestion = sortedSuggestions.find(s => s.range.from < currentPos) || sortedSuggestions[0];
             
-            // Scroll to and select the suggestion
             this.editor.commands.setTextSelection({ from: prevSuggestion.range.from, to: prevSuggestion.range.to });
             console.log('🔍 Navigated to previous suggestion:', prevSuggestion.ruleKey);
           }
@@ -257,12 +325,11 @@ export default function TipTapEditor({
     }
   });
 
-  // Memoized extensions array to prevent unnecessary re-creation
+  // Memoized extensions array with separated plugins
   const extensions = useMemo(() => [
     StarterKit.configure({
-      // Optimize for performance
       history: {
-        depth: 100, // Limit undo history for better performance
+        depth: 100,
         newGroupDelay: 500,
       }
     }),
@@ -280,14 +347,15 @@ export default function TipTapEditor({
       defaultAlignment: 'left',
     }),
     KeyboardShortcutExtension,
-    SuggestionHighlightExtension,
+    GrammarHighlightExtension,
+    SmartReviewHighlightExtension,
     Placeholder.configure({
       placeholder: 'Start writing your masterpiece...',
     }),
-  ], []); // Empty dependency array - these never change
+  ], []);
   
   // Performance-optimized update handler
-  const handleUpdate = useCallback(({ editor }: { editor: any }) => {
+  const handleUpdate = useCallback(({ editor, transaction }: { editor: any, transaction?: any }) => {
     // Debounce content updates to prevent excessive re-renders
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
@@ -297,6 +365,32 @@ export default function TipTapEditor({
       const html = editor.getHTML();
       const text = editor.getText();
       
+      // Only check for suggestion dismissal if there's an actual text change
+      if (transaction?.docChanged) {
+        const { from, to } = transaction;
+        const activeSuggestion = getActiveSuggestions().find((s: Suggestion) => 
+          s.status === 'new' && 
+          s.range.from <= from && 
+          s.range.to >= to
+        );
+        
+        if (activeSuggestion) {
+          console.log('🎯 Dismissing suggestion due to text change:', activeSuggestion.id);
+          updateSuggestionStatus(activeSuggestion.id, 'dismissed');
+          // Also dismiss any active tooltip
+          setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
+        }
+        
+        // Additionally check if any active tooltip's suggestion was affected by the edit
+        if (tooltip.show && tooltip.suggestion) {
+          const tooltipRange = tooltip.suggestion.range;
+          if (from <= tooltipRange.to && to >= tooltipRange.from) {
+            // The edit overlaps with the tooltip's suggestion range
+            setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
+          }
+        }
+      }
+      
       onUpdate?.(html);
       onTextChange?.(text);
       
@@ -305,28 +399,31 @@ export default function TipTapEditor({
         debouncedGrammarCheck(text);
       }
     }, 100); // 100ms debounce for content updates
-  }, [onUpdate, onTextChange, debouncedGrammarCheck]);
+  }, [getActiveSuggestions, updateSuggestionStatus, onUpdate, onTextChange, debouncedGrammarCheck, tooltip, setTooltip]);
   
   // Create editor with performance optimizations
   const editor = useEditor({
     extensions,
     content,
     onUpdate: handleUpdate,
+    onSelectionUpdate: ({ editor }) => {
+      // Dismiss tooltip when user starts selecting text
+      if (editor.state.selection.from !== editor.state.selection.to) {
+        setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
+      }
+    },
     editorProps: {
       attributes: {
         class: 'prose prose-lg max-w-none focus:outline-none min-h-[400px] p-4 editor-content',
         'data-placeholder': 'Start writing...',
-        spellcheck: 'false', // Disable browser spellcheck for better performance
+        spellcheck: 'false',
       },
-      // Performance optimization: limit DOM updates
       transformPastedHTML: (html) => {
-        // Basic HTML sanitization for performance
         return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
       },
     },
-    // Optimize editor creation
     immediatelyRender: false,
-    shouldRerenderOnTransaction: false, // Prevent unnecessary re-renders
+    shouldRerenderOnTransaction: false,
   });
 
   // Update editor content when content prop changes
@@ -336,13 +433,18 @@ export default function TipTapEditor({
     }
   }, [editor, content]);
 
-  // Notify parent when editor is created
+  // Notify parent when editor is created and initialize word count
   useEffect(() => {
     if (editor && onEditorCreate) {
       console.log('🔄 Editor instance created and passed to parent');
       onEditorCreate(editor);
+      
+      // Initialize word count
+      const text = editor.getText();
+      const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+      setWordCount(wordCount);
     }
-  }, [editor, onEditorCreate]);
+  }, [editor, onEditorCreate, setWordCount]);
 
   // Return editor instance on cleanup
   useEffect(() => {
@@ -375,6 +477,47 @@ export default function TipTapEditor({
     setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
   }, []);
 
+  // Handle suggestion dismissal
+  const handleDismissSuggestion = useCallback((suggestionId: string) => {
+    const suggestion = getActiveSuggestions().find(s => s.id === suggestionId);
+    if (!suggestion) return;
+    
+    console.log('🎯 Dismissing suggestion:', {
+      id: suggestionId,
+      type: suggestion.type,
+      range: suggestion.range
+    });
+    
+    // Update suggestion status
+    updateSuggestionStatus(suggestionId, 'dismissed');
+    
+    // Hide tooltip
+    setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
+    
+    // Force refresh of decorations with dismissal info
+    if (editor) {
+      const { view } = editor;
+      const tr = view.state.tr;
+      
+      // Add dismissal metadata but DON'T update ranges since this is a manual dismissal
+      tr.setMeta('dismissedSuggestion', {
+        id: suggestionId,
+        range: suggestion.range,
+        skipRangeUpdate: true // Add flag to indicate this is a manual dismissal
+      });
+      
+      // Update appropriate suggestion system
+      if (suggestion.type === 'smart') {
+        tr.setMeta('smartReviewSuggestionsChanged', true);
+      } else {
+        tr.setMeta('grammarSuggestionsChanged', true);
+      }
+      
+      tr.setMeta('forceUpdate', true);
+      view.dispatch(tr);
+    }
+  }, [editor, getActiveSuggestions, updateSuggestionStatus, setTooltip]);
+
   // Add event listeners for suggestion interactions
   useEffect(() => {
     if (!editor) return;
@@ -388,7 +531,7 @@ export default function TipTapEditor({
       
       if (highlight && highlight.dataset.suggestionId) {
         const suggestionId = highlight.dataset.suggestionId;
-        const suggestion = suggestions.find(s => s.id === suggestionId);
+        const suggestion = getActiveSuggestions().find(s => s.id === suggestionId);
         
         if (suggestion) {
           showTooltip(highlight, suggestion);
@@ -412,29 +555,65 @@ export default function TipTapEditor({
       }
     };
 
-    editorElement.addEventListener('mouseenter', handleHighlightHover, true);
-    editorElement.addEventListener('mouseleave', handleHighlightLeave, true);
+    // Handle click on highlights
+    const handleHighlightClick = (event: Event) => {
+      const target = event.target as HTMLElement;
+      const highlight = target.closest('[data-suggestion-id]') as HTMLElement;
+      
+      if (highlight && highlight.dataset.suggestionId) {
+        const suggestionId = highlight.dataset.suggestionId;
+        // Dismiss the suggestion
+        handleDismissSuggestion(suggestionId);
+        // Prevent any default editor behavior
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    editorElement.addEventListener('mouseover', handleHighlightHover, true);
+    editorElement.addEventListener('mouseout', handleHighlightLeave, true);
+    editorElement.addEventListener('click', handleHighlightClick, true);
 
     return () => {
-      editorElement.removeEventListener('mouseenter', handleHighlightHover, true);
-      editorElement.removeEventListener('mouseleave', handleHighlightLeave, true);
+      editorElement.removeEventListener('mouseover', handleHighlightHover, true);
+      editorElement.removeEventListener('mouseout', handleHighlightLeave, true);
+      editorElement.removeEventListener('click', handleHighlightClick, true);
     };
-  }, [editor, suggestions, showTooltip, hideTooltip]);
+  }, [editor, getActiveSuggestions, showTooltip, hideTooltip, handleDismissSuggestion]);
 
-  // Optimized suggestions update with deep comparison
+  // Update grammar suggestions when they change
   useEffect(() => {
     if (!editor) return;
     
-    // Update decorations when suggestions change
-    const { view } = editor;
-    const tr = view.state.tr;
-    tr.setMeta('suggestions', suggestions);
-    tr.setMeta('forceUpdate', true);
-    view.dispatch(tr);
+    const timeoutId = setTimeout(() => {
+      const { view } = editor;
+      if (!view) return;
+      
+      const tr = view.state.tr;
+      tr.setMeta('grammarSuggestions', grammarSuggestions);
+      tr.setMeta('forceUpdate', true);
+      view.dispatch(tr);
+    }, 0);
     
-    // Update lastSuggestionsRef
-    lastSuggestionsRef.current = suggestions;
-  }, [editor, suggestions]);
+    return () => clearTimeout(timeoutId);
+  }, [editor, grammarSuggestions]);
+
+  // Update smart review suggestions when they change
+  useEffect(() => {
+    if (!editor) return;
+    
+    const timeoutId = setTimeout(() => {
+      const { view } = editor;
+      if (!view) return;
+      
+      const tr = view.state.tr;
+      tr.setMeta('smartReviewSuggestions', smartReviewSuggestions);
+      tr.setMeta('forceUpdate', true);
+      view.dispatch(tr);
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
+  }, [editor, smartReviewSuggestions]);
   
   // Cleanup on unmount
   useEffect(() => {
@@ -449,20 +628,43 @@ export default function TipTapEditor({
   const handleApplySuggestion = useCallback(async (suggestionId: string, replacement: string) => {
     if (!editor) return;
     
-    const suggestion = suggestions.find(s => s.id === suggestionId);
+    const suggestion = getActiveSuggestions().find(s => s.id === suggestionId);
     if (!suggestion) return;
 
     const { from, to } = suggestion.range;
+    
+    // Get the text content around the suggestion
+    const doc = editor.state.doc;
+    const beforeChar = from > 0 ? doc.textBetween(from - 1, from) : '';
+    const afterChar = to < doc.content.size ? doc.textBetween(to, to + 1) : '';
+    
+    // Clean up the replacement text
+    const cleanReplacement = replacement.trim();
+    
+    // Only preserve spaces if they exist in the original text
+    const shouldPreserveLeadingSpace = beforeChar === ' ' && suggestion.original.startsWith(' ');
+    const shouldPreserveTrailingSpace = afterChar === ' ' && suggestion.original.endsWith(' ');
+    
+    // Build the final replacement text with preserved spaces only if they existed in original
+    const finalReplacement = `${shouldPreserveLeadingSpace ? ' ' : ''}${cleanReplacement}${shouldPreserveTrailingSpace ? ' ' : ''}`;
+    
+    // Calculate length differences for range updates
     const originalLength = to - from;
-    const newLength = replacement.length;
+    const newLength = finalReplacement.length;
     const lengthDiff = newLength - originalLength;
 
     console.log('🔄 Applying suggestion:', {
       suggestionId,
       original: suggestion.original,
-      replacement,
+      replacement: finalReplacement,
       range: { from, to },
-      lengthDiff
+      lengthDiff,
+      context: {
+        beforeChar,
+        afterChar,
+        preserveLeading: shouldPreserveLeadingSpace,
+        preserveTrailing: shouldPreserveTrailingSpace
+      }
     });
 
     // Use TipTap's transaction system for precise replacement
@@ -470,7 +672,7 @@ export default function TipTapEditor({
     const { state } = view;
     
     // Create a transaction to replace the text
-    const tr = state.tr.replaceWith(from, to, state.schema.text(replacement));
+    const tr = state.tr.replaceWith(from, to, state.schema.text(finalReplacement));
     view.dispatch(tr);
 
     // Update suggestion status
@@ -493,20 +695,14 @@ export default function TipTapEditor({
       tr.setMeta('suggestionsChanged', true);
       tr.setMeta('forceUpdate', true);
       view.dispatch(tr);
-    }, 50); // Reduced timeout for faster refresh
+    }, 50);
 
     // Trigger immediate autosave after suggestion application
     if (onSuggestionApplied) {
       console.log('💾 Triggering immediate autosave after suggestion application in TipTapEditor');
       await onSuggestionApplied();
     }
-  }, [editor, suggestions, updateSuggestionStatus, onSuggestionApplied]);
-
-  // Handle suggestion dismissal
-  const handleDismissSuggestion = useCallback((suggestionId: string) => {
-    updateSuggestionStatus(suggestionId, 'dismissed');
-    setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
-  }, [updateSuggestionStatus]);
+  }, [editor, getActiveSuggestions, updateSuggestionStatus, onSuggestionApplied]);
 
   // Add keyboard shortcuts
   const { getShortcutLabel } = useKeyboardShortcuts({
@@ -522,12 +718,35 @@ export default function TipTapEditor({
 
   if (!editor) {
     return (
-      <div className="bg-slate-50 rounded-2xl overflow-hidden animate-pulse">
-        <div className="p-6 space-y-3">
-          <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-          <div className="h-4 bg-slate-200 rounded w-1/2"></div>
-          <div className="h-4 bg-slate-200 rounded w-5/6"></div>
-          <div className="h-32 bg-slate-200 rounded w-full"></div>
+      <div className="bg-slate-50 rounded-2xl overflow-hidden">
+        {/* Loading Toolbar */}
+        <div className="overflow-x-auto bg-slate-100 dark:bg-slate-200 text-slate-800 shadow-inner rounded-t-xl">
+          <div className="flex gap-1 px-3 py-2 min-w-max animate-pulse">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className="h-8 w-8 bg-slate-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+        {/* Loading Content */}
+        <div className="p-6 space-y-4 animate-pulse">
+          {/* Title-like */}
+          <div className="h-6 bg-slate-200 rounded w-1/2"></div>
+          {/* Paragraphs */}
+          <div className="space-y-3">
+            <div className="h-4 bg-slate-200 rounded w-full"></div>
+            <div className="h-4 bg-slate-200 rounded w-5/6"></div>
+            <div className="h-4 bg-slate-200 rounded w-4/5"></div>
+          </div>
+          <div className="space-y-3">
+            <div className="h-4 bg-slate-200 rounded w-full"></div>
+            <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+            <div className="h-4 bg-slate-200 rounded w-4/5"></div>
+          </div>
+          <div className="space-y-3">
+            <div className="h-4 bg-slate-200 rounded w-5/6"></div>
+            <div className="h-4 bg-slate-200 rounded w-full"></div>
+            <div className="h-4 bg-slate-200 rounded w-4/5"></div>
+          </div>
         </div>
       </div>
     );
@@ -539,6 +758,9 @@ export default function TipTapEditor({
         .suggestion-highlight {
           position: relative;
           z-index: 1;
+          cursor: pointer;
+          user-select: none;
+          -webkit-user-select: none;
         }
         .suggestion-highlight:hover {
           background-color: rgba(59, 130, 246, 0.4) !important;
@@ -565,6 +787,13 @@ export default function TipTapEditor({
         }
         .hl-spelling:hover {
           background-color: rgba(59, 130, 246, 0.35) !important;
+        }
+        .hl-smart {
+          background-color: rgba(147, 51, 234, 0.2) !important;
+          border-bottom-color: #9333ea !important;
+        }
+        .hl-smart:hover {
+          background-color: rgba(147, 51, 234, 0.35) !important;
         }
         /* Ensure proper text flow */
         .editor-content p {
@@ -960,20 +1189,36 @@ export default function TipTapEditor({
             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
               tooltip.suggestion.type === 'grammar' ? 'bg-red-100 text-red-800' :
               tooltip.suggestion.type === 'style' ? 'bg-blue-100 text-blue-800' :
+              tooltip.suggestion.type === 'smart' ? 'bg-purple-100 text-purple-800' :
               'bg-purple-100 text-purple-800'
             }`}>
               {tooltip.suggestion.type}
             </span>
           </div>
 
-          {/* Original → Replacement */}
-          <div className="mb-3">
-            <div className="flex items-center space-x-2 text-sm">
-              <span className="text-red-600 line-through">{tooltip.suggestion.original}</span>
-              <span className="text-gray-400">→</span>
-              <span className="text-green-600 font-medium">{tooltip.suggestion.replacements[0]}</span>
+          {/* Original → Replacement (only for non-smart suggestions) */}
+          {tooltip.suggestion.type !== 'smart' && (
+            <div className="mb-3">
+              <div className="flex items-center space-x-2 text-sm">
+                <span className="text-red-600 line-through">{tooltip.suggestion.original}</span>
+                <span className="text-gray-400">→</span>
+                <span className="text-green-600 font-medium">
+                  {tooltip.suggestion.replacements && tooltip.suggestion.replacements.length > 0 
+                    ? tooltip.suggestion.replacements[0] 
+                    : 'No replacement available'}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
+          
+          {/* Smart Review - just show the highlighted text */}
+          {tooltip.suggestion.type === 'smart' && (
+            <div className="mb-3">
+              <div className="text-sm">
+                <span className="text-purple-400 font-medium">"{tooltip.suggestion.original}"</span>
+              </div>
+            </div>
+          )}
 
           {/* Explanation */}
           <p className="text-sm text-gray-600 mb-3">
@@ -982,18 +1227,36 @@ export default function TipTapEditor({
 
           {/* Action Buttons */}
           <div className="flex space-x-2">
-            <button
-              onClick={() => handleApplySuggestion(tooltip.suggestion!.id, tooltip.suggestion!.replacements[0])}
-              className="flex-1 px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors"
-            >
-              Apply
-            </button>
-            <button
-              onClick={() => handleDismissSuggestion(tooltip.suggestion!.id)}
-              className="flex-1 px-3 py-1 bg-gray-600 text-white rounded text-sm font-medium hover:bg-gray-700 transition-colors"
-            >
-              Dismiss
-            </button>
+            {tooltip.suggestion?.type === 'smart' ? (
+              // Smart Review suggestions only have Dismiss
+              <button
+                onClick={() => handleDismissSuggestion(tooltip.suggestion!.id)}
+                className="flex-1 px-3 py-1 bg-gray-600 text-white rounded text-sm font-medium hover:bg-gray-700 transition-colors"
+              >
+                Dismiss
+              </button>
+            ) : (
+              // Grammar suggestions have Apply + Dismiss
+              <>
+                <button
+                  onClick={() => {
+                    if (tooltip.suggestion?.replacements && tooltip.suggestion.replacements.length > 0) {
+                      handleApplySuggestion(tooltip.suggestion.id, tooltip.suggestion.replacements[0]);
+                    }
+                  }}
+                  disabled={!tooltip.suggestion?.replacements || tooltip.suggestion.replacements.length === 0}
+                  className="flex-1 px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={() => handleDismissSuggestion(tooltip.suggestion!.id)}
+                  className="flex-1 px-3 py-1 bg-gray-600 text-white rounded text-sm font-medium hover:bg-gray-700 transition-colors"
+                >
+                  Dismiss
+                </button>
+              </>
+            )}
           </div>
 
           {/* Tooltip Arrow */}

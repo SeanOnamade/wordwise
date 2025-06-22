@@ -9,7 +9,7 @@ interface SmartReviewButtonProps {
 }
 
 export default function SmartReviewButton({ editor }: SmartReviewButtonProps) {
-  const { runSmartReview, smartReview } = useEditorStore();
+  const { runSmartReview, smartReview, setSmartReviewError } = useEditorStore();
 
   const handleSmartReview = async () => {
     if (!editor) return;
@@ -18,12 +18,18 @@ export default function SmartReviewButton({ editor }: SmartReviewButtonProps) {
     const content = editor.getText();
     
     if (!content.trim()) {
-      // Could show a toast here instead
-      alert('Please write some content first!');
+      setSmartReviewError('Please write some content first!');
       return;
     }
 
-    await runSmartReview(content);
+    try {
+      console.log('🔄 Starting Smart Review...');
+      await runSmartReview(content);
+      console.log('✅ Smart Review completed');
+    } catch (error) {
+      console.error('❌ Smart Review failed:', error);
+      setSmartReviewError(error instanceof Error ? error.message : 'Smart Review failed. Please try again.');
+    }
   };
 
   return (
