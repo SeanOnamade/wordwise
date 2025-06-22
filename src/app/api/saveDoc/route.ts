@@ -3,6 +3,12 @@ import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { getAlternativeAdminDb } from '@/lib/firebase-admin';
 
+interface Document {
+  id: string;
+  updatedAt?: string | number | Date;
+  [key: string]: any;
+}
+
 // Helper function for comprehensive Firebase Admin diagnostics
 function assertAdminConfig() {
   console.info('🔍 Starting Firebase Admin diagnostics...');
@@ -434,7 +440,7 @@ export async function GET(request: Request) {
       const documents = querySnapshot.docs.map(docToJson);
 
       // Sort documents manually to ensure correct order
-      documents.sort((a, b) => {
+      documents.sort((a: { updatedAt?: any }, b: { updatedAt?: any }) => {
         const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
         const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
         return dateB - dateA;

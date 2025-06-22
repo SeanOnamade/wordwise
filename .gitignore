@@ -206,4 +206,10 @@ pnpm-lock.yaml
 
 # Generated files
 *.map
-*.d.ts.map 
+*.d.ts.map
+
+# sveltekit
+.svelte-kit/
+
+# User-specific files
+serviceAccountKey.json 
