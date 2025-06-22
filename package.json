@@ -12,7 +12,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "diagram": "mmdc -i docs/architecture.mmd -o public/architecture.png -t dark --width 1200 --height 800",
-    "postinstall": "if [ \"$CI\" != \"true\" ]; then npm run diagram; fi"
+    "postinstall": "if [ \"$VERCEL\" != \"1\" ]; then npm run diagram; fi"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
