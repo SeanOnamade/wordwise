@@ -130,6 +130,138 @@ async function retryFirestoreOperation<T>(
   throw new Error('Max retries exceeded');
 }
 
+// REST API fallback for Firestore reads (bypasses gRPC issues)
+async function queryFirestoreREST(userId: string) {
+  console.log('🌐 Using Firestore REST API fallback...');
+  
+  try {
+    const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
+    const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+    const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+    
+    if (!projectId || !privateKey || !clientEmail) {
+      throw new Error('Missing Firebase credentials for REST API');
+    }
+
+    // Create JWT token for authentication
+    const jwt = require('jsonwebtoken');
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      iss: clientEmail,
+      sub: clientEmail,
+      aud: 'https://firestore.googleapis.com/google.firestore.v1.Firestore',
+      iat: now,
+      exp: now + 3600, // 1 hour
+      scope: 'https://www.googleapis.com/auth/datastore'
+    };
+
+    const processedPrivateKey = privateKey.includes('\\n') 
+      ? privateKey.replace(/\\n/g, '\n')
+      : privateKey;
+
+    const token = jwt.sign(payload, processedPrivateKey, { algorithm: 'RS256' });
+
+    // Get access token
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: token
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error(`Token request failed: ${tokenResponse.status}`);
+    }
+
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
+
+    // Query Firestore using REST API
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`;
+    
+    const queryBody = {
+      structuredQuery: {
+        from: [{ collectionId: 'documents' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'ownerUid' },
+            op: 'EQUAL',
+            value: { stringValue: userId }
+          }
+        },
+        orderBy: [
+          {
+            field: { fieldPath: 'updatedAt' },
+            direction: 'DESCENDING'
+          }
+        ],
+        limit: 50
+      }
+    };
+
+    const queryResponse = await fetch(firestoreUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(queryBody)
+    });
+
+    if (!queryResponse.ok) {
+      throw new Error(`Firestore REST query failed: ${queryResponse.status}`);
+    }
+
+    const queryData = await queryResponse.json();
+    console.log('✅ REST API query successful');
+
+    // Transform REST API response to match Admin SDK format
+    const documents = queryData
+      .filter((item: any) => item.document)
+      .map((item: any) => {
+        const doc = item.document;
+        const docId = doc.name.split('/').pop();
+        
+        // Convert Firestore values to plain objects
+        const data: any = {};
+        if (doc.fields) {
+          for (const [key, value] of Object.entries(doc.fields)) {
+            if (typeof value === 'object' && value !== null) {
+              const fieldValue = value as any;
+              if (fieldValue.stringValue !== undefined) {
+                data[key] = fieldValue.stringValue;
+              } else if (fieldValue.timestampValue !== undefined) {
+                data[key] = new Date(fieldValue.timestampValue);
+              } else if (fieldValue.integerValue !== undefined) {
+                data[key] = parseInt(fieldValue.integerValue);
+              } else if (fieldValue.doubleValue !== undefined) {
+                data[key] = fieldValue.doubleValue;
+              } else if (fieldValue.booleanValue !== undefined) {
+                data[key] = fieldValue.booleanValue;
+              }
+            }
+          }
+        }
+
+        return {
+          id: docId,
+          ...data
+        };
+      });
+
+    console.log(`📄 REST API found ${documents.length} documents`);
+    return documents;
+
+  } catch (error) {
+    console.error('❌ REST API fallback failed:', error);
+    throw error;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     // Run pre-flight diagnostics
@@ -307,6 +439,21 @@ export async function GET(request: Request) {
         // Enhanced error logging for DECODER issues
         if (queryError instanceof Error && queryError.message.includes('DECODER routines::unsupported')) {
           console.error('🔍 DECODER error during READ operation detected!');
+          console.error('🌐 Attempting REST API fallback to bypass gRPC issues...');
+          
+          try {
+            const documents = await queryFirestoreREST(userId);
+            
+            return NextResponse.json({
+              success: true,
+              documents,
+              usedRestFallback: true,
+              note: 'Used Firestore REST API to bypass serverless gRPC limitations'
+            });
+          } catch (restError) {
+            console.error('❌ REST API fallback also failed:', restError);
+          }
+          
           console.error('💡 Attempting fallback with alternative Firebase Admin initialization...');
           
           try {
