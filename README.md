@@ -66,7 +66,7 @@ WordWise uses a modern, scalable architecture with Next.js frontend, LanguageToo
    ```bash
    npm run dev
    ```
-   
+
    Visit http://localhost:3000 to start writing!
 
 ## User Personas
@@ -257,7 +257,7 @@ The convergence of several technological and social trends makes this the perfec
 We welcome contributions! Please see our [contribution guidelines](CONTRIBUTING.md) for details.
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)  
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Run tests: `npm run test && npm run lint && npm run typecheck`
 4. Commit your changes (`git commit -m 'Add some amazing feature'`)
 5. Push to the branch (`git push origin feature/amazing-feature`)
