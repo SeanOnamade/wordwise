@@ -1,6 +1,7 @@
 'use server';
 
-import { PDFDocument, StandardFonts, PDFPage } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { parse } from 'node-html-parser';
 
 // CSS styles for PDF export
 const PDF_STYLES = `
@@ -102,268 +103,379 @@ interface ExportToPdfOptions {
   title?: string;
 }
 
-interface FormattedText {
-  text: string;
-  isBold?: boolean;
-  isItalic?: boolean;
-  isUnderline?: boolean;
-  isStrike?: boolean;
-  isHeading?: 1 | 2 | 3;
-  alignment?: 'left' | 'center' | 'right' | 'justify';
+interface ParsedElement {
+  type: 'text' | 'heading' | 'paragraph' | 'list-item' | 'break';
+  content: string;
+  formatting: {
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    strikethrough?: boolean;
+    heading?: 1 | 2 | 3 | 4 | 5 | 6;
+    alignment?: 'left' | 'center' | 'right' | 'justify';
+  };
+  listLevel?: number;
+  isOrderedList?: boolean;
 }
 
 function stripGrammarHighlights(html: string): string {
-  // Remove grammar check highlights but keep their text content
-  let cleanHtml = html;
-  
-  // Remove mark tags with data-suggestion-id
-  cleanHtml = cleanHtml.replace(/<mark[^>]*data-suggestion-id[^>]*>(.*?)<\/mark>/gi, '$1');
-  
-  // Remove elements with lt-error class
-  cleanHtml = cleanHtml.replace(/<[^>]*class="[^"]*lt-error[^"]*"[^>]*>(.*?)<\/[^>]+>/gi, '$1');
-  
-  // Remove elements with suggestion-highlight class
-  cleanHtml = cleanHtml.replace(/<[^>]*class="[^"]*suggestion-highlight[^"]*"[^>]*>(.*?)<\/[^>]+>/gi, '$1');
-  
-  // Remove any remaining grammar-related classes
-  cleanHtml = cleanHtml.replace(/class="[^"]*hl-[^"]*"/gi, '');
-  
-  return cleanHtml;
+  return html
+    .replace(/<mark[^>]*data-suggestion-id[^>]*>(.*?)<\/mark>/gi, '$1')
+    .replace(/<[^>]*class="[^"]*lt-error[^"]*"[^>]*>(.*?)<\/[^>]+>/gi, '$1')
+    .replace(/<[^>]*class="[^"]*suggestion-highlight[^"]*"[^>]*>(.*?)<\/[^>]+>/gi, '$1')
+    .replace(/class="[^"]*hl-[^"]*"/gi, '');
 }
 
-function parseHTML(html: string): FormattedText[] {
-  // First strip grammar highlights
+function parseHTMLToElements(html: string): ParsedElement[] {
   const cleanHtml = stripGrammarHighlights(html);
-  const result: FormattedText[] = [];
-
-  // Simple HTML parser using regex
-  const parseElement = (htmlString: string, currentFormat: Partial<FormattedText> = {}): void => {
-    // Handle line breaks
-    htmlString = htmlString.replace(/<br\s*\/?>/gi, '\n');
-    
-    // Find the next opening tag
-    const tagMatch = htmlString.match(/<([^\/][^>]*)>/);
-    if (!tagMatch) {
-      // No more tags, just text content
-      const text = htmlString.replace(/<[^>]*>/g, '').trim();
+  const elements: ParsedElement[] = [];
+  
+  // Parse HTML using node-html-parser
+  const root = parse(cleanHtml);
+  
+  function processNode(node: any, inheritedFormatting: ParsedElement['formatting'] = {}): void {
+    // Handle text nodes
+    if (node.nodeType === 3) { // Text node
+      const text = node.text?.trim();
       if (text) {
-        // Split by newlines to handle paragraph breaks
-        const lines = text.split('\n');
-        lines.forEach((line, index) => {
-          if (line.trim()) {
-            result.push({ text: line.trim(), ...currentFormat });
-          }
+        elements.push({
+          type: 'text',
+          content: text,
+          formatting: { ...inheritedFormatting }
         });
       }
       return;
     }
 
-    const beforeTag = htmlString.substring(0, tagMatch.index!);
-    if (beforeTag.trim()) {
-      result.push({ text: beforeTag.trim(), ...currentFormat });
-    }
-
-    const fullTag = tagMatch[0];
-    const tagContent = tagMatch[1];
-    const tagName = tagContent.split(' ')[0].toLowerCase();
-    
-    // Find the matching closing tag
-    const closingTag = `</${tagName}>`;
-    const closingIndex = htmlString.indexOf(closingTag, tagMatch.index! + fullTag.length);
-    
-    if (closingIndex === -1) {
-      // No closing tag, continue parsing
-      const remaining = htmlString.substring(tagMatch.index! + fullTag.length);
-      parseElement(remaining, currentFormat);
-      return;
-    }
-
-    // Extract content between tags
-    const contentStart = tagMatch.index! + fullTag.length;
-    const content = htmlString.substring(contentStart, closingIndex);
-    const after = htmlString.substring(closingIndex + closingTag.length);
-
-    // Determine new formatting based on tag
-    const newFormat = { ...currentFormat };
-    
-    // Get alignment from style or class
-    let alignment: FormattedText['alignment'] = currentFormat.alignment || 'left';
-    if (fullTag.includes('text-align: center') || fullTag.includes('align-center')) alignment = 'center';
-    else if (fullTag.includes('text-align: right') || fullTag.includes('align-right')) alignment = 'right';
-    else if (fullTag.includes('text-align: justify') || fullTag.includes('align-justify')) alignment = 'justify';
-    
-    newFormat.alignment = alignment;
-
-    switch (tagName) {
-      case 'strong':
-      case 'b':
-        newFormat.isBold = true;
-        break;
-      case 'em':
-      case 'i':
-        newFormat.isItalic = true;
-        break;
-      case 'u':
-        newFormat.isUnderline = true;
-        break;
-      case 's':
-      case 'strike':
-      case 'del':
-        newFormat.isStrike = true;
-        break;
-      case 'h1':
-        newFormat.isHeading = 1;
-        newFormat.isBold = true;
-        break;
-      case 'h2':
-        newFormat.isHeading = 2;
-        newFormat.isBold = true;
-        break;
-      case 'h3':
-        newFormat.isHeading = 3;
-        newFormat.isBold = true;
-        break;
-      case 'li':
-        // Add bullet point for list items
-        if (content.trim()) {
-          result.push({ text: '• ' + content.replace(/<[^>]*>/g, '').trim(), ...newFormat });
-        }
-        if (after.trim()) {
-          parseElement(after, currentFormat);
-        }
-        return;
-      case 'p':
-      case 'div':
-        // Add paragraph spacing
-        if (result.length > 0) {
-          result.push({ text: '\n' });
-        }
-        break;
-    }
-
-    // Parse the content with the new formatting
-    if (content.trim()) {
-      parseElement(content, newFormat);
-    }
-
-    // Add spacing after block elements
-    if (['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
-      result.push({ text: '\n' });
-    }
-
-    // Continue parsing the rest
-    if (after.trim()) {
-      parseElement(after, currentFormat);
-    }
-  };
-
-  // Start parsing
-  parseElement(cleanHtml);
-
-  // Clean up excessive newlines
-  const cleaned: FormattedText[] = [];
-  let lastWasNewline = false;
-
-  for (const item of result) {
-    if (item.text === '\n') {
-      if (!lastWasNewline) {
-        cleaned.push(item);
-        lastWasNewline = true;
+    // Handle element nodes
+    if (node.nodeType === 1) { // Element node
+      const tagName = node.tagName?.toLowerCase();
+      const newFormatting = { ...inheritedFormatting };
+      
+      // Extract alignment from style or class
+      const style = node.getAttribute('style') || '';
+      const className = node.getAttribute('class') || '';
+      
+      if (style.includes('text-align: center') || className.includes('align-center')) {
+        newFormatting.alignment = 'center';
+      } else if (style.includes('text-align: right') || className.includes('align-right')) {
+        newFormatting.alignment = 'right';
+      } else if (style.includes('text-align: justify') || className.includes('align-justify')) {
+        newFormatting.alignment = 'justify';
       }
-    } else {
-      cleaned.push(item);
-      lastWasNewline = false;
+      
+      switch (tagName) {
+        case 'strong':
+        case 'b':
+          newFormatting.bold = true;
+          break;
+        case 'em':
+        case 'i':
+          newFormatting.italic = true;
+          break;
+        case 'u':
+          newFormatting.underline = true;
+          break;
+        case 's':
+        case 'strike':
+        case 'del':
+          newFormatting.strikethrough = true;
+          break;
+        case 'h1':
+        case 'h2':
+        case 'h3':
+        case 'h4':
+        case 'h5':
+        case 'h6':
+          newFormatting.heading = parseInt(tagName.charAt(1)) as 1 | 2 | 3 | 4 | 5 | 6;
+          newFormatting.bold = true;
+          break;
+        case 'p':
+          // Process paragraph content
+          if (node.text?.trim()) {
+            node.childNodes.forEach((child: any) => processNode(child, newFormatting));
+            elements.push({ type: 'break', content: '', formatting: {} });
+          }
+          return;
+        case 'div':
+          // Process div content and add break if needed
+          node.childNodes.forEach((child: any) => processNode(child, newFormatting));
+          if (node.text?.trim()) {
+            elements.push({ type: 'break', content: '', formatting: {} });
+          }
+          return;
+        case 'li':
+          const listParent = node.parentNode;
+          const isOrdered = listParent?.tagName?.toLowerCase() === 'ol';
+          const listLevel = getListLevel(node);
+          
+          if (node.text?.trim()) {
+            elements.push({
+              type: 'list-item',
+              content: node.text.trim(),
+              formatting: newFormatting,
+              listLevel,
+              isOrderedList: isOrdered
+            });
+          }
+          return;
+        case 'br':
+          elements.push({ type: 'break', content: '', formatting: {} });
+          return;
+        case 'ul':
+        case 'ol':
+          // Process list items
+          node.childNodes.forEach((child: any) => processNode(child, newFormatting));
+          elements.push({ type: 'break', content: '', formatting: {} });
+          return;
+      }
+      
+      // Process child nodes with inherited formatting
+      node.childNodes.forEach((child: any) => processNode(child, newFormatting));
+      
+      // Add spacing after block elements
+      if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
+        elements.push({ type: 'break', content: '', formatting: {} });
+      }
     }
   }
+  
+  function getListLevel(node: any): number {
+    let level = 0;
+    let parent = node.parentNode;
+    while (parent) {
+      if (['ul', 'ol'].includes(parent.tagName?.toLowerCase())) {
+        level++;
+      }
+      parent = parent.parentNode;
+    }
+    return level;
+  }
+  
+  // Process all root nodes
+  root.childNodes.forEach((node: any) => processNode(node));
+  
+  return elements.length > 0 ? elements : [{ type: 'text', content: 'Empty document', formatting: {} }];
+}
 
-  return cleaned.length > 0 ? cleaned : [{ text: 'Empty document' }];
+function wrapText(text: string, font: any, fontSize: number, maxWidth: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+    
+    if (testWidth <= maxWidth) {
+      currentLine = testLine;
+    } else {
+      if (currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        // Word is too long, break it character by character
+        const chars = word.split('');
+        let currentChunk = '';
+        
+        for (const char of chars) {
+          const testChunk = currentChunk + char;
+          const chunkWidth = font.widthOfTextAtSize(testChunk, fontSize);
+          
+          if (chunkWidth <= maxWidth) {
+            currentChunk = testChunk;
+          } else {
+            if (currentChunk) {
+              lines.push(currentChunk);
+              currentChunk = char;
+            } else {
+              // Even single character is too wide, just add it
+              lines.push(char);
+            }
+          }
+        }
+        
+        if (currentChunk) {
+          currentLine = currentChunk;
+        }
+      }
+    }
+  }
+  
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  
+  return lines.length > 0 ? lines : [''];
 }
 
 export async function exportToPdf({ html, title = 'wordwise-export' }: ExportToPdfOptions): Promise<Buffer> {
   try {
+    console.log('🔄 Starting PDF export with enhanced formatting...');
+    
     // Parse HTML content
-    const formattedText = parseHTML(html);
+    const elements = parseHTMLToElements(html);
+    console.log(`📄 Parsed ${elements.length} elements from HTML`);
 
-    // Create PDF document with A4 size
+    // Create PDF document
     const pdfDoc = await PDFDocument.create();
-    let currentPage = pdfDoc.addPage([595.28, 841.89]); // A4 size in points
+    let currentPage = pdfDoc.addPage([595.28, 841.89]); // A4 size
 
     // Embed fonts
-    const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const italicFont = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
-    const boldItalicFont = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
+    const fonts = {
+      regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+      bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+      italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
+      boldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique)
+    };
 
-    // Set up page margins and content area
+    // Page setup
     const margin = 56.7; // 2cm in points
     const contentWidth = currentPage.getWidth() - (margin * 2);
     let y = currentPage.getHeight() - margin;
+    const baseLineHeight = 1.4;
+    let listCounters: { [level: number]: number } = {};
 
-    // Draw content
-    for (const text of formattedText) {
-      if (text.text === '\n') {
-        y -= 14 * 1.5; // Standard line height
-        continue;
-      }
-
-      // Select font based on formatting
-      let font = regularFont;
-      if (text.isBold && text.isItalic) font = boldItalicFont;
-      else if (text.isBold) font = boldFont;
-      else if (text.isItalic) font = italicFont;
-
-      // Set font size based on heading level
-      let fontSize = 14;
-      if (text.isHeading === 1) fontSize = 28;
-      else if (text.isHeading === 2) fontSize = 24;
-      else if (text.isHeading === 3) fontSize = 20;
-
-      const lineHeight = fontSize * 1.5;
-
-      // Add new page if needed
-      if (y < margin + lineHeight) {
+    const addNewPageIfNeeded = (requiredHeight: number) => {
+      if (y - requiredHeight < margin + 20) { // Add 20pt buffer
         currentPage = pdfDoc.addPage([595.28, 841.89]);
         y = currentPage.getHeight() - margin;
+        console.log('📄 Added new page, y reset to:', y);
       }
+    };
 
-      // Calculate x position based on alignment
+    const selectFont = (formatting: ParsedElement['formatting']) => {
+      if (formatting.bold && formatting.italic) return fonts.boldItalic;
+      if (formatting.bold) return fonts.bold;
+      if (formatting.italic) return fonts.italic;
+      return fonts.regular;
+    };
+
+    const getFontSize = (formatting: ParsedElement['formatting']): number => {
+      if (formatting.heading) {
+        switch (formatting.heading) {
+          case 1: return 24; // Reduced from 28
+          case 2: return 20; // Reduced from 24
+          case 3: return 18; // Reduced from 20
+          case 4: return 16;
+          case 5: return 14;
+          case 6: return 12;
+          default: return 12;
+        }
+      }
+      return 11; // Slightly smaller base font
+    };
+
+    const getAlignment = (formatting: ParsedElement['formatting'], textWidth: number): number => {
+      switch (formatting.alignment) {
+        case 'center':
+          return margin + (contentWidth - textWidth) / 2;
+        case 'right':
+          return margin + contentWidth - textWidth;
+        case 'justify':
+          return margin; // Justification would need word spacing adjustment
+        default:
+          return margin;
+      }
+    };
+
+    // Process each element
+    for (let i = 0; i < elements.length; i++) {
+      const element = elements[i];
+      
+      if (element.type === 'break') {
+        y -= 12 * baseLineHeight;
+        continue;
+      }
+      
+      if (!element.content.trim()) continue;
+      
+      const font = selectFont(element.formatting);
+      const fontSize = getFontSize(element.formatting);
+      const lineHeight = fontSize * baseLineHeight;
+      
+      let content = element.content;
       let x = margin;
-      const textWidth = font.widthOfTextAtSize(text.text, fontSize);
-      if (text.alignment === 'center') x = margin + (contentWidth - textWidth) / 2;
-      else if (text.alignment === 'right') x = margin + contentWidth - textWidth;
-
-      // Draw text
-      currentPage.drawText(text.text, {
-        x,
-        y,
-        size: fontSize,
-        font,
-        lineHeight,
-        maxWidth: contentWidth
-      });
-
-      // Add underline or strikethrough if needed
-      if (text.isUnderline || text.isStrike) {
-        const lineY = text.isUnderline ? y - 2 : y + fontSize * 0.3;
-        currentPage.drawLine({
-          start: { x, y: lineY },
-          end: { x: x + textWidth, y: lineY },
-          thickness: 1
-        });
+      
+      // Handle list items
+      if (element.type === 'list-item') {
+        const level = element.listLevel || 1;
+        const indent = (level - 1) * 20;
+        x = margin + indent;
+        
+        if (element.isOrderedList) {
+          if (!listCounters[level]) listCounters[level] = 1;
+          content = `${listCounters[level]}. ${content}`;
+          listCounters[level]++;
+          // Reset deeper level counters
+          for (let l = level + 1; l <= 10; l++) {
+            delete listCounters[l];
+          }
+        } else {
+          const bullets = ['•', '◦', '▪', '▫'];
+          const bullet = bullets[(level - 1) % bullets.length];
+          content = `${bullet} ${content}`;
+        }
       }
-
-      // Move to next line
-      y -= lineHeight;
-
+      
+      // Wrap text to fit page width
+      const availableWidth = contentWidth - (x - margin);
+      const lines = wrapText(content, font, fontSize, availableWidth);
+      
+      // Check if we need a new page
+      const totalHeight = lines.length * lineHeight + (element.formatting.heading ? lineHeight * 0.5 : 0);
+      addNewPageIfNeeded(totalHeight);
+      
+      // Draw each line
+      for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        const line = lines[lineIndex];
+        const textWidth = font.widthOfTextAtSize(line, fontSize);
+        const lineX = lineIndex === 0 ? getAlignment(element.formatting, textWidth) : x;
+        
+        // Draw text
+        currentPage.drawText(line, {
+          x: lineX,
+          y,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0)
+        });
+        
+        // Draw underline or strikethrough
+        if (element.formatting.underline) {
+          currentPage.drawLine({
+            start: { x: lineX, y: y - 2 },
+            end: { x: lineX + textWidth, y: y - 2 },
+            thickness: 0.5,
+            color: rgb(0, 0, 0)
+          });
+        }
+        
+        if (element.formatting.strikethrough) {
+          currentPage.drawLine({
+            start: { x: lineX, y: y + fontSize * 0.3 },
+            end: { x: lineX + textWidth, y: y + fontSize * 0.3 },
+            thickness: 0.5,
+            color: rgb(0, 0, 0)
+          });
+        }
+        
+        y -= lineHeight;
+      }
+      
       // Add extra spacing after headings
-      if (text.isHeading) y -= fontSize * 0.5;
+      if (element.formatting.heading) {
+        y -= lineHeight * 0.3;
+      }
     }
 
+    console.log('✅ PDF generation completed successfully');
+    
     // Save PDF
     const pdfBytes = await pdfDoc.save();
     return Buffer.from(pdfBytes);
   } catch (error) {
-    console.error('Error in exportToPdf:', error);
+    console.error('❌ Error in exportToPdf:', error);
     throw error;
   }
 }

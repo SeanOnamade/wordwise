@@ -325,8 +325,19 @@ export default function TipTapEditor({
   // Notify parent when editor is created
   useEffect(() => {
     if (editor && onEditorCreate) {
+      console.log('🔄 Editor instance created and passed to parent');
       onEditorCreate(editor);
     }
+  }, [editor, onEditorCreate]);
+
+  // Return editor instance on cleanup
+  useEffect(() => {
+    return () => {
+      if (editor && onEditorCreate) {
+        console.log('🔄 Editor instance cleanup');
+        onEditorCreate(null);
+      }
+    };
   }, [editor, onEditorCreate]);
 
   // Show tooltip on hover

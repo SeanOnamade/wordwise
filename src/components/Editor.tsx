@@ -18,13 +18,17 @@ import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { useAutosave } from '@/hooks/useAutosave';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { auth, createPerformanceTrace } from '@/lib/firebase';
-import ThemeToggle from './ThemeToggle';
-import KeyboardShortcuts from './KeyboardShortcuts';
+import ThemeToggle from '@/components/ThemeToggle';
+import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Toggle } from '@/components/ui/toggle';
 import { checkText } from '@/lib/grammar';
 import debounce from 'lodash/debounce';
+import { useGrammarCheck } from '@/hooks/useGrammarCheck';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import ShareButton from '@/components/ShareButton';
+import ExportButton from '@/components/ExportButton';
 // import { db } from '@/lib/firebase'; // Temporarily disabled
 
 // Create plugin key for grammar highlights
@@ -455,37 +459,6 @@ const Editor = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [tiptapEditor, saveDocument]);
 
-  const exportDocument = async (format: 'pdf' | 'docx') => {
-    if (!tiptapEditor) return;
-    
-    try {
-      const response = await fetch('/api/export', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: tiptapEditor.getHTML(),
-          format,
-        }),
-      });
-      
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${currentDoc?.title || 'document'}.${format}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      console.error('Export failed:', error);
-    }
-  };
-
   // Enhanced show tooltip function
   const showTooltip = (element: HTMLElement, text: string, suggestionId?: string) => {
     setTooltip({
@@ -673,31 +646,21 @@ const Editor = () => {
                   </>
                 )}
               </Button>
-                              <Button
-                  onClick={() => exportDocument('pdf')}
-                  size="lg"
-                  variant="secondary"
-                  className="flex items-center gap-2 font-medium"
+              <ExportButton />
+              {process.env.NODE_ENV === 'development' && (
+                <Button
+                  onClick={() => {
+                    // Test Sentry error reporting
+                    throw new Error('Test error for Sentry monitoring');
+                  }}
+                  variant="destructive"
+                  size="sm"
+                  className="text-xs"
+                  title="Test Sentry (Development only)"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <span>Export PDF</span>
+                  🐛 Test
                 </Button>
-                {process.env.NODE_ENV === 'development' && (
-                  <Button
-                    onClick={() => {
-                      // Test Sentry error reporting
-                      throw new Error('Test error for Sentry monitoring');
-                    }}
-                    variant="destructive"
-                    size="sm"
-                    className="text-xs"
-                    title="Test Sentry (Development only)"
-                  >
-                    🐛 Test
-                  </Button>
-                )}
+              )}
             </div>
           </div>
         </header>
