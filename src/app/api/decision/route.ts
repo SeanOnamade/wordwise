@@ -20,6 +20,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+
     await adminDb.collection('decisions').add({
       userId,
       docId,
