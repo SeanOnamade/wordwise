@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { doc, setDoc, serverTimestamp, Firestore } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
 interface UseAutosaveProps {
@@ -31,18 +31,10 @@ export function useAutosave({ docId, content, title, enabled = true }: UseAutosa
       console.log('📝 No document ID provided');
       return;
     }
-    if (!auth || !auth.currentUser) {
+    if (!auth?.currentUser) {
       console.log('📝 No authenticated user');
       return;
     }
-    if (!db) {
-      console.error('🔥 Firestore write FAILED: Firestore not initialized');
-      setError('Firestore not initialized');
-      return;
-    }
-
-    // After all checks, we know db is initialized
-    const firestore: Firestore = db;
 
     // Check if either content or title has changed
     const contentChanged = content !== lastSavedRef.current.content;
@@ -50,6 +42,13 @@ export function useAutosave({ docId, content, title, enabled = true }: UseAutosa
     
     if (!contentChanged && !titleChanged) {
       console.log('📝 No changes detected, skipping save');
+      return;
+    }
+
+    // Early return if Firestore isn't initialized
+    if (!db) {
+      console.error('🔥 Firestore write FAILED: Firestore not initialized');
+      setError('Firestore not initialized');
       return;
     }
 
@@ -68,26 +67,28 @@ export function useAutosave({ docId, content, title, enabled = true }: UseAutosa
       clearTimeout(timeoutRef.current);
     }
 
-    // Get current user ID once since we know it exists
-    const userId = auth.currentUser.uid;
-
     // Set new timeout for 2s debounce
     const saveTimeout = setTimeout(async () => {
       try {
         setIsSaving(true);
         setError(null);
+
+        // Double-check Firestore is still initialized
+        if (!db) {
+          throw new Error('Firestore not initialized');
+        }
         
-        const docRef = doc(firestore, 'documents', docId);
+        const docRef = doc(db, 'documents', docId);
         const data = {
-          ownerUid: userId,
+          ownerUid: auth.currentUser?.uid,
           title,
           content,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp() // Changed from lastModified to match our schema
         };
 
         console.log('📝 Attempting Firestore write...', {
           docId,
-          userId,
+          userId: auth.currentUser?.uid,
           contentLength: content.length,
           title
         });

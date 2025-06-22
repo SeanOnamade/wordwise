@@ -1,72 +1,56 @@
 'use client';
 
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, Auth } from 'firebase/auth';
-import { getFirestore, setLogLevel, Firestore } from 'firebase/firestore';
-
-// Helper function to clean environment variables
-export const cleanEnv = (key: string) => process.env[key]?.trim() ?? '';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
+import { getFirestore, setLogLevel } from 'firebase/firestore';
 
 // Only import Performance in production
-const isProduction = cleanEnv('NEXT_PUBLIC_ENV') === 'prod';
-let getPerformance: typeof import('firebase/performance')['getPerformance'] | undefined;
-let trace: typeof import('firebase/performance')['trace'] | undefined;
-let perf: any = null; // We'll type this as any since Firebase Performance types are complex
+const isProduction = process.env.NEXT_PUBLIC_ENV === 'prod';
+let getPerformance: any;
+let trace: any;
 
 if (typeof window !== 'undefined' && isProduction) {
-  import('firebase/performance').then((performanceModule) => {
-    getPerformance = performanceModule.getPerformance;
-    trace = performanceModule.trace;
-  });
+  const performanceModule = require('firebase/performance');
+  getPerformance = performanceModule.getPerformance;
+  trace = performanceModule.trace;
 }
 
 const firebaseConfig = {
-  apiKey: cleanEnv('NEXT_PUBLIC_FIREBASE_API_KEY'),
-  authDomain: cleanEnv('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN'),
-  projectId: cleanEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID'),
-  storageBucket: cleanEnv('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET'),
-  messagingSenderId: cleanEnv('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID'),
-  appId: cleanEnv('NEXT_PUBLIC_FIREBASE_APP_ID'),
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase only once on client side
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
-let db: Firestore | null = null;
+// Initialize Firebase only on client side
+let app: any = null;
+let auth: any = null;
+let db: any = null;
+let perf: any = null;
 
-if (typeof window !== 'undefined' && getApps().length === 0) {
-  try {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-    
-    // Only initialize Performance in production
-    if (isProduction && getPerformance) {
-      perf = getPerformance(app);
-    } else {
-      console.log('🚫 Firebase Performance SDK disabled in development');
-    }
-    
-    // Enable Firestore debug logging in development
-    if (!isProduction) {
-      setLogLevel('debug');
-    }
-  } catch (error) {
-    console.error('Failed to initialize Firebase:', error);
-  }
-} else if (typeof window !== 'undefined') {
-  // Get existing app instance
-  app = getApps()[0];
+if (typeof window !== 'undefined') {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
   db = getFirestore(app);
-  if (isProduction && getPerformance) {
+  
+  // Only initialize Performance in production
+  if (isProduction) {
     perf = getPerformance(app);
+  } else {
+    console.log('🚫 Firebase Performance SDK disabled in development');
+  }
+  
+  // Enable Firestore debug logging in development
+  if (!isProduction) {
+    setLogLevel('debug');
   }
 }
 
 // Enhanced performance monitoring helper
 export const createPerformanceTrace = (traceName: string) => {
-  if (perf && trace && typeof window !== 'undefined' && isProduction) {
+  if (perf && typeof window !== 'undefined' && isProduction) {
     try {
       const traceInstance = trace(perf, traceName);
       
@@ -166,10 +150,6 @@ export const trackError = (error: Error, context?: Record<string, any>) => {
 };
 
 export const sendSignInLink = async (email: string) => {
-  if (!auth) {
-    throw new Error('Firebase auth not initialized');
-  }
-
   const actionCodeSettings = {
     url: `${window.location.origin}/editor`,
     handleCodeInApp: true,
@@ -187,10 +167,6 @@ export const sendSignInLink = async (email: string) => {
 };
 
 export const confirmSignIn = async (email: string) => {
-  if (!auth) {
-    throw new Error('Firebase auth not initialized');
-  }
-
   if (isSignInWithEmailLink(auth, window.location.href)) {
     try {
       await signInWithEmailLink(auth, email, window.location.href);
