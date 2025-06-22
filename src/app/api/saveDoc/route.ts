@@ -159,9 +159,41 @@ async function queryFirestoreREST(userId: string) {
       scope: 'https://www.googleapis.com/auth/datastore'
     };
 
-    const processedPrivateKey = privateKey.includes('\\n') 
-      ? privateKey.replace(/\\n/g, '\n')
-      : privateKey;
+    // More thorough private key processing for JWT
+    let processedPrivateKey = privateKey;
+    
+    // Remove JSON quotes if present
+    if (processedPrivateKey.startsWith('"') && processedPrivateKey.endsWith('"')) {
+      processedPrivateKey = processedPrivateKey.slice(1, -1);
+    }
+    
+    // Replace escaped newlines
+    if (processedPrivateKey.includes('\\n')) {
+      processedPrivateKey = processedPrivateKey.replace(/\\n/g, '\n');
+    }
+    
+    // Ensure proper PEM format
+    if (!processedPrivateKey.startsWith('-----BEGIN PRIVATE KEY-----')) {
+      processedPrivateKey = '-----BEGIN PRIVATE KEY-----\n' + processedPrivateKey;
+    }
+    if (!processedPrivateKey.endsWith('-----END PRIVATE KEY-----')) {
+      processedPrivateKey = processedPrivateKey + '\n-----END PRIVATE KEY-----';
+    }
+    
+    // Clean up any double formatting
+    processedPrivateKey = processedPrivateKey
+      .replace(/-----BEGIN PRIVATE KEY-----\s+/g, '-----BEGIN PRIVATE KEY-----\n')
+      .replace(/\s+-----END PRIVATE KEY-----/g, '\n-----END PRIVATE KEY-----');
+
+    console.log('🔑 JWT private key processing:', {
+      originalLength: privateKey.length,
+      processedLength: processedPrivateKey.length,
+      startsWithQuote: privateKey.startsWith('"'),
+      hasEscapedNewlines: privateKey.includes('\\n'),
+      finalHasRealNewlines: processedPrivateKey.includes('\n'),
+      finalStartsCorrectly: processedPrivateKey.startsWith('-----BEGIN PRIVATE KEY-----'),
+      finalEndsCorrectly: processedPrivateKey.endsWith('-----END PRIVATE KEY-----')
+    });
 
     const token = jwt.sign(payload, processedPrivateKey, { algorithm: 'RS256' });
 
