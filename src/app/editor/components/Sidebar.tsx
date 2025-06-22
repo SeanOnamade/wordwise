@@ -65,9 +65,21 @@ export default function Sidebar() {
             id: doc.id,
             title: doc.title || 'Untitled Document',
             content: doc.content || '',
-            lastModified: doc.lastModified ? new Date(doc.lastModified) : new Date(doc.createdAt),
+            lastModified: doc.updatedAt ? new Date(doc.updatedAt) : (doc.createdAt ? new Date(doc.createdAt) : new Date()),
             createdAt: doc.createdAt ? new Date(doc.createdAt) : new Date()
           }));
+
+          // Always sort documents client-side to ensure consistent order
+          docs.sort((a: Document, b: Document) => {
+            const dateA = a.lastModified || a.createdAt;
+            const dateB = b.lastModified || b.createdAt;
+            // Ensure we have valid dates before comparing
+            if (dateA && dateB) {
+              return dateB.getTime() - dateA.getTime();
+            }
+            return 0; // Or handle as per your logic if dates can be null
+          });
+
           setDocuments(docs);
 
           // If no current document is selected, select the most recent one
