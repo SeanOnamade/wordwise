@@ -10,34 +10,28 @@ const mockSuggestions = [
     id: '1',
     original: 'teh',
     replacement: 'the',
-    type: 'spelling' as const,
+    type: 'grammar',
     range: { from: 0, to: 3 },
-    status: 'pending' as const,
-    explanation: 'Spelling correction',
-    ruleKey: 'DEMO',
-    replacements: ['the']
+    status: 'pending',
+    explanation: 'Spelling correction'
   },
   {
     id: '2', 
     original: 'realy',
     replacement: 'really',
-    type: 'spelling' as const,
+    type: 'fluency',
     range: { from: 10, to: 15 },
-    status: 'pending' as const,
-    explanation: 'Improve fluency',
-    ruleKey: 'DEMO',
-    replacements: ['really']
+    status: 'pending',
+    explanation: 'Improve fluency'
   },
   {
     id: '3',
     original: 'amazing',
     replacement: 'excellent',
-    type: 'style' as const,
+    type: 'tone',
     range: { from: 20, to: 27 },
-    status: 'pending' as const, 
-    explanation: 'Better tone for academic writing',
-    ruleKey: 'DEMO',
-    replacements: ['excellent']
+    status: 'pending', 
+    explanation: 'Better tone for academic writing'
   }
 ];
 
