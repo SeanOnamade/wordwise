@@ -15,11 +15,6 @@ export const metadata: Metadata = {
   keywords: 'writing assistant, grammar checker, academic writing, AI writing, proofreading',
   authors: [{ name: 'WordWise Team' }],
   robots: 'index, follow',
-  icons: {
-    icon: '/icon.svg',
-    shortcut: '/icon.svg',
-    apple: '/icon.svg',
-  },
   openGraph: {
     title: 'WordWise - AI-Powered Writing Assistant',
     description: 'Improve your academic writing with intelligent grammar suggestions and real-time feedback.',
