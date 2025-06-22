@@ -198,13 +198,12 @@ async function queryFirestoreREST(userId: string) {
     console.log('✅ Google Auth Library authentication successful');
 
     // Query Firestore using REST API with updated collection path
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`;
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}:runQuery`;
     
     const queryBody = {
       structuredQuery: {
         from: [{ 
-          collectionId: 'documents',
-          parent: `projects/${projectId}/databases/(default)/documents/users/${userId}`
+          collectionId: 'documents'
         }],
         orderBy: [
           {
