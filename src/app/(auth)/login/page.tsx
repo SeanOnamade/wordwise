@@ -111,15 +111,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Welcome to WordWise</h2>
-          <p className="mt-2 text-gray-600">AI-powered writing assistant</p>
+          <h2 className="text-3xl font-bold text-white">Welcome to WordWise</h2>
+          <p className="mt-2 text-slate-400">AI-powered writing assistant</p>
         </div>
 
         {/* Mode Toggle */}
-        <div className="flex bg-gray-100 rounded-lg p-1">
+        <div className="flex bg-slate-800 rounded-lg p-1">
           <button
             type="button"
             onClick={() => {
@@ -129,8 +129,8 @@ export default function LoginPage() {
             }}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
               isSignInMode
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
             Sign In
@@ -144,8 +144,8 @@ export default function LoginPage() {
             }}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
               !isSignInMode
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
             Create Account
@@ -154,14 +154,14 @@ export default function LoginPage() {
         
         <form className="mt-8 space-y-6" onSubmit={isSignInMode ? handleSignIn : handleCreateAccount}>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
               Email Address
             </label>
             <input
               id="email"
               type="email"
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white"
               placeholder="Enter your email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -170,14 +170,14 @@ export default function LoginPage() {
           </div>
           
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">
               Password
             </label>
             <input
               id="password"
               type="password"
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white"
               placeholder={isSignInMode ? "Enter your password" : "Choose a password (min 6 characters)"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -188,13 +188,13 @@ export default function LoginPage() {
 
           {error && (
             <div 
-              className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg" 
+              className="bg-red-900/50 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg" 
               role="alert"
               aria-live="assertive"
             >
               <div className="flex items-start">
                 <svg 
-                  className="w-5 h-5 mr-3 mt-0.5 flex-shrink-0 text-red-600" 
+                  className="w-5 h-5 mr-3 mt-0.5 flex-shrink-0 text-red-400" 
                   fill="currentColor" 
                   viewBox="0 0 20 20"
                   aria-hidden="true"
@@ -206,8 +206,8 @@ export default function LoginPage() {
                   />
                 </svg>
                 <div>
-                  <h4 className="font-medium text-red-800">Authentication Error</h4>
-                  <p className="text-sm text-red-700 mt-1">{error}</p>
+                  <h4 className="font-medium text-red-300">Authentication Error</h4>
+                  <p className="text-sm text-red-400 mt-1">{error}</p>
                 </div>
               </div>
             </div>
@@ -215,13 +215,13 @@ export default function LoginPage() {
 
           {message && (
             <div 
-              className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg"
+              className="bg-green-900/50 border border-green-500/30 text-green-300 px-4 py-3 rounded-lg"
               role="status" 
               aria-live="polite"
             >
               <div className="flex items-center">
                 <svg 
-                  className="w-5 h-5 mr-3 flex-shrink-0 text-green-600" 
+                  className="w-5 h-5 mr-3 flex-shrink-0 text-green-400" 
                   fill="currentColor" 
                   viewBox="0 0 20 20"
                   aria-hidden="true"
@@ -240,22 +240,21 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading || !email || !password || !authReady}
-            className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {!authReady ? 'Initializing...' : isLoading ? 'Signing in...' : 'Sign In / Create Account'}
+            {isLoading 
+              ? (isSignInMode ? 'Signing in...' : 'Creating account...') 
+              : (isSignInMode ? 'Sign In' : 'Create Account')
+            }
           </button>
           
-          {/* Debug info */}
-          <div className="text-xs text-gray-400 text-center">
-            Email: {email ? '✓' : '✗'} | Password: {password ? '✓' : '✗'} | Auth: {authReady ? '✓' : '✗'}
+          <div className="text-xs text-slate-500 text-center">
+            New to WordWise? Don't worry! We'll automatically create your account if you don't have one yet. Just enter your email and choose a password.
           </div>
-          
-          <div className="text-center">
-            <p className="text-xs text-gray-500">
-              New to WordWise? Don't worry! We'll automatically create your account
-              <br />
-              if you don't have one yet. Just enter your email and choose a password.
-            </p>
+
+          {/* Debug info */}
+          <div className="text-xs text-slate-500 text-center">
+            Email: {email ? '✓' : '✗'} | Password: {password ? '✓' : '✗'} | Auth: {authReady ? '✓' : '✗'}
           </div>
         </form>
       </div>

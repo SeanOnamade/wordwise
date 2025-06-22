@@ -55,37 +55,45 @@ export default function SuggestionDrawer({ editor, isLoading = false, onSuggesti
       const suggestion = suggestions.find(s => s.id === suggestionId);
       
       if (suggestion && editor) {
-        const { original } = suggestion;
+        const { from, to } = suggestion.range;
+        const originalLength = to - from;
+        const newLength = replacement.length;
+        const lengthDiff = newLength - originalLength;
+
+        console.log('🔄 Applying suggestion from drawer:', {
+          suggestionId,
+          original: suggestion.original,
+          replacement,
+          range: { from, to },
+          lengthDiff
+        });
+
+        // Use TipTap's precise replacement method
+        const { view } = editor;
+        const { state } = view;
         
-        // Simple approach: replace in the HTML content
-        const currentHTML = editor.getHTML();
-        const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        
-        // Create a regex that matches the original text
-        const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'i');
-        
-        if (regex.test(currentHTML)) {
-          const newHTML = currentHTML.replace(regex, replacement);
-          editor.commands.setContent(newHTML);
-        } else {
-          // Fallback: try direct text replacement without word boundaries
-          const simpleRegex = new RegExp(escapedOriginal, 'i');
-          if (simpleRegex.test(currentHTML)) {
-            const newHTML = currentHTML.replace(simpleRegex, replacement);
-            editor.commands.setContent(newHTML);
-          }
-        }
+        // Create a transaction to replace the text
+        const tr = state.tr.replaceWith(from, to, state.schema.text(replacement));
+        view.dispatch(tr);
         
         // Update suggestion status
         updateSuggestionStatus(suggestionId, 'applied');
         
-        // Force refresh of decorations to remove highlights
+        // Update ranges of all remaining suggestions that come after this one
+        const { updateSuggestionRanges } = useEditorStore.getState();
+        if (updateSuggestionRanges && lengthDiff !== 0) {
+          console.log('📐 Updating ranges for remaining suggestions from drawer');
+          updateSuggestionRanges(from, lengthDiff, suggestionId);
+        }
+        
+        // Force refresh of decorations to remove highlights and realign
         setTimeout(() => {
           const { view } = editor;
           const tr = view.state.tr;
           tr.setMeta('suggestionsChanged', true);
+          tr.setMeta('forceUpdate', true);
           view.dispatch(tr);
-        }, 100);
+        }, 50); // Reduced timeout for faster refresh
 
         // Trigger immediate autosave after suggestion application
         if (onSuggestionApplied) {
@@ -106,12 +114,13 @@ export default function SuggestionDrawer({ editor, isLoading = false, onSuggesti
     try {
       updateSuggestionStatus(suggestionId, 'dismissed');
       
-      // Force refresh of decorations to remove highlights
+      // Force refresh of decorations to remove highlights and realign
       if (editor) {
         setTimeout(() => {
           const { view } = editor;
           const tr = view.state.tr;
           tr.setMeta('suggestionsChanged', true);
+          tr.setMeta('forceUpdate', true);
           view.dispatch(tr);
         }, 100);
       }

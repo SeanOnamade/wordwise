@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Editor } from '@tiptap/react';
+import { SmartReview, SmartReviewState } from '@/types/SmartReview';
 
 export type Suggestion = {
   id: string;
@@ -30,6 +31,7 @@ interface EditorState {
   };
   currentDoc: Document | null;
   documents: Document[];
+  smartReview: SmartReviewState;
   setEditor: (editor: Editor | null) => void;
   addSuggestion: (suggestion: Suggestion) => void;
   updateSuggestionStatus: (id: string, status: 'applied' | 'dismissed') => void;
@@ -42,9 +44,14 @@ interface EditorState {
   setWordCount: (count: number) => void;
   updatePerformanceMetrics: (responseTime: number) => void;
   clearSuggestions: () => void;
+  updateSuggestionRanges: (appliedFrom: number, lengthDiff: number, appliedSuggestionId: string) => void;
+  runSmartReview: (content: string) => Promise<void>;
+  closeSmartReview: () => void;
+  setSmartReviewLoading: (loading: boolean) => void;
+  setSmartReviewError: (error: string | undefined) => void;
 }
 
-export const useEditorStore = create<EditorState>((set) => ({
+export const useEditorStore = create<EditorState>((set, get) => ({
   editor: null,
   suggestions: [],
   wordCount: 0,
@@ -54,6 +61,12 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
   currentDoc: null,
   documents: [],
+  smartReview: {
+    data: null,
+    isOpen: false,
+    loading: false,
+    error: undefined,
+  },
   setEditor: (editor) => set({ editor }),
   addSuggestion: (sug) => {
     // TEMP LOG – remove after working
@@ -126,4 +139,97 @@ export const useEditorStore = create<EditorState>((set) => ({
       },
     })),
   clearSuggestions: () => set({ suggestions: [] }),
+  updateSuggestionRanges: (appliedFrom: number, lengthDiff: number, appliedSuggestionId: string) =>
+    set((state) => ({
+      suggestions: state.suggestions.map((suggestion) => {
+        // Skip the applied suggestion and already processed suggestions
+        if (suggestion.id === appliedSuggestionId || suggestion.status !== 'new') {
+          return suggestion;
+        }
+        
+        // Only update suggestions that come after the applied position
+        if (suggestion.range.from > appliedFrom) {
+          console.log('📐 Updating suggestion range:', {
+            id: suggestion.id,
+            original: suggestion.original,
+            oldRange: { from: suggestion.range.from, to: suggestion.range.to },
+            lengthDiff
+          });
+          
+          return {
+            ...suggestion,
+            range: {
+              from: suggestion.range.from + lengthDiff,
+              to: suggestion.range.to + lengthDiff
+            }
+          };
+        }
+        
+        return suggestion;
+      })
+    })),
+  runSmartReview: async (content: string) => {
+    set((state) => ({
+      smartReview: {
+        ...state.smartReview,
+        loading: true,
+        error: undefined,
+        isOpen: true,
+      },
+    }));
+
+    try {
+      const response = await fetch('/api/smart-review', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Smart Review API error: ${response.status}`);
+      }
+
+      const smartReviewData: SmartReview = await response.json();
+
+      set((state) => ({
+        smartReview: {
+          ...state.smartReview,
+          data: smartReviewData,
+          loading: false,
+        },
+      }));
+    } catch (error) {
+      console.error('Smart Review error:', error);
+      set((state) => ({
+        smartReview: {
+          ...state.smartReview,
+          loading: false,
+          error: error instanceof Error ? error.message : 'Failed to generate smart review',
+        },
+      }));
+    }
+  },
+  closeSmartReview: () =>
+    set((state) => ({
+      smartReview: {
+        ...state.smartReview,
+        isOpen: false,
+      },
+    })),
+  setSmartReviewLoading: (loading) =>
+    set((state) => ({
+      smartReview: {
+        ...state.smartReview,
+        loading,
+      },
+    })),
+  setSmartReviewError: (error) =>
+    set((state) => ({
+      smartReview: {
+        ...state.smartReview,
+        error,
+      },
+    })),
 })); 

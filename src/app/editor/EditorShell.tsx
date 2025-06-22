@@ -5,6 +5,8 @@ import { useEditorStore } from '@/store/editorStore';
 import { auth } from '@/lib/firebase';
 import Sidebar from './components/Sidebar';
 import SuggestionDrawer from './components/SuggestionDrawer';
+import SmartReviewDrawer from '../../components/SmartReviewDrawer';
+import SmartReviewButton from '../../components/SmartReviewButton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import TipTapEditor from './components/TipTapEditor';
@@ -29,7 +31,8 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
     addSuggestion, 
     clearSuggestions, 
     setWordCount, 
-    updatePerformanceMetrics 
+    updatePerformanceMetrics,
+    smartReview
   } = useEditorStore();
   
   const [editorInstance, setEditorInstance] = useState<any>(null);
@@ -235,11 +238,25 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
               <Button
                 onClick={handleGrammarCheck}
                 disabled={isGrammarChecking}
-                variant="outline"
-                className="text-slate-300 hover:text-white border-slate-500 hover:border-slate-400"
+                variant="default"
+                size="sm"
+                className="bg-slate-600 hover:bg-slate-700 text-white disabled:opacity-50 flex items-center gap-2"
               >
-                {isGrammarChecking ? 'Checking...' : 'Check Grammar'}
+                {isGrammarChecking ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm">✓</span>
+                    Check Grammar
+                  </>
+                )}
               </Button>
+              
+              <SmartReviewButton editor={editorInstance} />
+              
               <CopyHTMLButton 
                 editor={editorInstance} 
                 className="text-black"
@@ -267,13 +284,17 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
             </div>
           </div>
 
-          {/* Suggestions Drawer */}
+          {/* Right Sidebar - Smart Review or Suggestions */}
           <div className="w-80 border-l border-white/10">
-            <SuggestionDrawer 
-              editor={editorInstance} 
-              isLoading={isGrammarChecking}
-              onSuggestionApplied={handleSuggestionApplied}
-            />
+            {smartReview.isOpen ? (
+              <SmartReviewDrawer />
+            ) : (
+              <SuggestionDrawer 
+                editor={editorInstance} 
+                isLoading={isGrammarChecking}
+                onSuggestionApplied={handleSuggestionApplied}
+              />
+            )}
           </div>
         </div>
       </div>

@@ -105,12 +105,20 @@ const createSuggestionHighlightPlugin = () => {
         
         // Only recreate decorations if suggestions changed or forced update
         if (newSuggestions !== undefined || forceUpdate || suggestionsChanged) {
+          console.log('🎨 Recreating suggestion decorations:', {
+            newSuggestions: !!newSuggestions,
+            forceUpdate,
+            suggestionsChanged,
+            activeCount: currentSuggestions.filter(s => s.status === 'new').length
+          });
           return createDecorations(tr.doc, currentSuggestions);
         }
         
         // Map existing decorations for document changes only
         if (tr.docChanged) {
-          return oldDecorations.map(tr.mapping, tr.doc);
+          const mappedDecorations = oldDecorations.map(tr.mapping, tr.doc);
+          console.log('🎨 Mapping decorations after document change');
+          return mappedDecorations;
         }
         
         return oldDecorations;
@@ -444,9 +452,18 @@ export default function TipTapEditor({
     const suggestion = suggestions.find(s => s.id === suggestionId);
     if (!suggestion) return;
 
-    // Get current text content
-    const currentText = editor.getText();
     const { from, to } = suggestion.range;
+    const originalLength = to - from;
+    const newLength = replacement.length;
+    const lengthDiff = newLength - originalLength;
+
+    console.log('🔄 Applying suggestion:', {
+      suggestionId,
+      original: suggestion.original,
+      replacement,
+      range: { from, to },
+      lengthDiff
+    });
 
     // Use TipTap's transaction system for precise replacement
     const { view } = editor;
@@ -459,8 +476,24 @@ export default function TipTapEditor({
     // Update suggestion status
     updateSuggestionStatus(suggestionId, 'applied');
     
+    // Update ranges of all remaining suggestions that come after this one
+    const { updateSuggestionRanges } = useEditorStore.getState();
+    if (updateSuggestionRanges && lengthDiff !== 0) {
+      console.log('📐 Updating ranges for remaining suggestions');
+      updateSuggestionRanges(from, lengthDiff, suggestionId);
+    }
+    
     // Hide tooltip
     setTooltip({ show: false, suggestion: null, position: { x: 0, y: 0 }, element: null });
+
+    // Force refresh of decorations after suggestion application
+    setTimeout(() => {
+      const { view } = editor;
+      const tr = view.state.tr;
+      tr.setMeta('suggestionsChanged', true);
+      tr.setMeta('forceUpdate', true);
+      view.dispatch(tr);
+    }, 50); // Reduced timeout for faster refresh
 
     // Trigger immediate autosave after suggestion application
     if (onSuggestionApplied) {

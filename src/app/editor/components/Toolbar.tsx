@@ -237,6 +237,8 @@ export default function Toolbar({ editor }: ToolbarProps) {
         >
           1.
         </Toggle>
+
+
       </div>
     </div>
   );
