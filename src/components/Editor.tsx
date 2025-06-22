@@ -399,6 +399,7 @@ const Editor = () => {
     docId: currentDoc?.id || '',
     content: currentDoc?.content || '',
     title: currentDoc?.title || '',
+    createdAt: currentDoc?.createdAt || null,
     enabled: !!currentDoc?.id && !!auth?.currentUser
   });
 
