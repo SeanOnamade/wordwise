@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { getAlternativeAdminDb } from '@/lib/firebase-admin';
 
 // Helper function for comprehensive Firebase Admin diagnostics
@@ -67,38 +67,42 @@ function assertAdminConfig() {
   return { projectId: projectId!, clientEmail: clientEmail!, privateKey: processedPrivateKey };
 }
 
-// Diagnostic Firestore test
+// Helper function to test Firestore connection and trigger fallbacks
 async function testFirestoreConnection() {
-  if (!adminDb) {
-    throw new Error('AdminDb not initialized');
-  }
-  
-  console.info('🔥 Testing Firestore connection...');
+  console.log('🔥 Testing Firestore connection...');
   
   try {
-    // Try a simple document get operation on a non-reserved collection
-    const testDocRef = adminDb.collection('test_connection').doc('ping');
-    const startTime = Date.now();
-    await testDocRef.get();
-    const duration = Date.now() - startTime;
-    
-    console.info('✅ Firestore connection test successful:', { duration });
-    return true;
-  } catch (firestoreError) {
+    await adminDb.collection('test_connection').limit(1).get();
+    console.log('✅ Firestore connection test successful');
+    return { success: true, method: 'admin-sdk' };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ Firestore connection test failed:', {
-      name: firestoreError instanceof Error ? firestoreError.name : 'Unknown',
-      message: firestoreError instanceof Error ? firestoreError.message : 'Unknown error',
-      code: (firestoreError as any)?.code,
-      details: (firestoreError as any)?.details
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: errorMessage,
+      code: (error as any)?.code,
+      details: (error as any)?.details
     });
-    
-    // If it's the DECODER error, log additional diagnostics
-    if (firestoreError instanceof Error && firestoreError.message.includes('DECODER routines::unsupported')) {
+
+    // Check for DECODER error and immediately try REST API
+    if (errorMessage.includes('DECODER routines::unsupported')) {
       console.error('🔍 DECODER error detected - this typically means the PEM private key is malformed');
       console.error('Common causes: Windows CRLF line endings, missing header/footer, or corrupted key data');
+      console.log('🌐 Switching to REST API mode to bypass gRPC issues...');
+      
+      // Test REST API connection
+      try {
+        const testUserId = 'test-connection-user';
+        await queryFirestoreREST(testUserId);
+        console.log('✅ REST API connection test successful');
+        return { success: true, method: 'rest-api' };
+      } catch (restError) {
+        console.error('❌ REST API connection test also failed:', restError);
+        return { success: false, method: 'none', error: restError };
+      }
     }
     
-    throw firestoreError;
+    return { success: false, method: 'none', error };
   }
 }
 
@@ -354,190 +358,165 @@ export async function GET(request: Request) {
       });
     }
 
-    // Test Firestore connection before proceeding
-    await testFirestoreConnection();
+    // Test Firestore connection and determine which method to use
+    const connectionTest = await testFirestoreConnection();
+    
+    if (!connectionTest.success) {
+      throw connectionTest.error || new Error('All connection methods failed');
+    }
 
     if (docId) {
       // Load specific document
       console.log('📂 Loading specific document:', docId);
-      const docRef = adminDb.collection('documents').doc(docId);
-      const docSnapshot = await docRef.get();
       
-      if (!docSnapshot.exists) {
-        return NextResponse.json(
-          { error: 'Document not found' },
-          { status: 404 }
-        );
-      }
-
-      const docData = docSnapshot.data();
-      
-      // Check if user owns the document
-      if (docData?.ownerUid !== userId) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 403 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        document: {
-          id: docSnapshot.id,
-          ...docData
+      if (connectionTest.method === 'rest-api') {
+        // Use REST API for single document
+        const documents = await queryFirestoreREST(userId);
+        const document = documents.find((doc: any) => doc.id === docId);
+        
+        if (!document) {
+          return NextResponse.json(
+            { error: 'Document not found' },
+            { status: 404 }
+          );
         }
-      });
+
+        return NextResponse.json({
+          success: true,
+          document,
+          usedRestApi: true
+        });
+      } else {
+        // Use Admin SDK
+        const docRef = adminDb.collection('documents').doc(docId);
+        const docSnapshot = await docRef.get();
+        
+        if (!docSnapshot.exists) {
+          return NextResponse.json(
+            { error: 'Document not found' },
+            { status: 404 }
+          );
+        }
+
+        const docData = docSnapshot.data();
+        
+        // Check if user owns the document
+        if (docData?.ownerUid !== userId) {
+          return NextResponse.json(
+            { error: 'Unauthorized' },
+            { status: 403 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          document: {
+            id: docSnapshot.id,
+            ...docData
+          }
+        });
+      }
     } else {
       // Load all user documents
       console.log('📂 Loading all documents for user:', userId);
       
-      try {
-        // Add detailed diagnostics before the query
-        console.log('🔍 Pre-query diagnostics:', {
-          adminDbExists: !!adminDb,
-          userId: userId,
-          userIdType: typeof userId,
-          userIdLength: userId.length,
-          environment: process.env.NODE_ENV,
-          vercelEnv: process.env.VERCEL_ENV
-        });
-
-        // Log the exact query being attempted
-        console.log('📊 Attempting Firestore query with parameters:', {
-          collection: 'documents',
-          whereField: 'ownerUid',
-          whereOperator: '==',
-          whereValue: userId,
-          orderByField: 'updatedAt',
-          orderByDirection: 'desc',
-          limitValue: 50
-        });
-
-        const docsSnapshot = await retryFirestoreOperation(async () => {
-          return await adminDb
-            .collection('documents')
-            .where('ownerUid', '==', userId)
-            .orderBy('updatedAt', 'desc')
-            .limit(50)
-            .get();
-        });
-
-        console.log('📂 Query completed, found documents:', docsSnapshot.size);
-
-        const documents = docsSnapshot.docs.map((doc: any) => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-
+      if (connectionTest.method === 'rest-api') {
+        console.log('🌐 Using REST API for document query...');
+        const documents = await queryFirestoreREST(userId);
+        
         return NextResponse.json({
           success: true,
-          documents
+          documents,
+          usedRestApi: true,
+          note: 'Used Firestore REST API to bypass serverless gRPC limitations'
         });
-      } catch (queryError) {
-        console.error('📂 Firestore query error:', queryError);
+      } else {
+        console.log('🔧 Using Admin SDK for document query...');
         
-        // Enhanced error logging for DECODER issues
-        if (queryError instanceof Error && queryError.message.includes('DECODER routines::unsupported')) {
-          console.error('🔍 DECODER error during READ operation detected!');
-          console.error('🌐 Attempting REST API fallback to bypass gRPC issues...');
-          
-          try {
-            const documents = await queryFirestoreREST(userId);
-            
-            return NextResponse.json({
-              success: true,
-              documents,
-              usedRestFallback: true,
-              note: 'Used Firestore REST API to bypass serverless gRPC limitations'
-            });
-          } catch (restError) {
-            console.error('❌ REST API fallback also failed:', restError);
-          }
-          
-          console.error('💡 Attempting fallback with alternative Firebase Admin initialization...');
-          
-          try {
-            const alternativeDb = getAlternativeAdminDb();
-            console.log('🔄 Retrying query with alternative admin...');
-            
-            const docsSnapshot = await alternativeDb
+        try {
+          // Add detailed diagnostics before the query
+          console.log('🔍 Pre-query diagnostics:', {
+            adminDbExists: !!adminDb,
+            userId: userId,
+            userIdType: typeof userId,
+            userIdLength: userId.length,
+            environment: process.env.NODE_ENV,
+            vercelEnv: process.env.VERCEL_ENV
+          });
+
+          // Log the exact query being attempted
+          console.log('📊 Attempting Firestore query with parameters:', {
+            collection: 'documents',
+            whereField: 'ownerUid',
+            whereOperator: '==',
+            whereValue: userId,
+            orderByField: 'updatedAt',
+            orderByDirection: 'desc',
+            limitValue: 50
+          });
+
+          const docsSnapshot = await retryFirestoreOperation(async () => {
+            return await adminDb
               .collection('documents')
               .where('ownerUid', '==', userId)
               .orderBy('updatedAt', 'desc')
               .limit(50)
               .get();
+          });
 
-            console.log('✅ Alternative admin query successful! Found documents:', docsSnapshot.size);
+          console.log('📂 Query completed, found documents:', docsSnapshot.size);
 
-            const documents = docsSnapshot.docs.map((doc: any) => ({
-              id: doc.id,
-              ...doc.data()
-            }));
+          const documents = docsSnapshot.docs.map((doc: QueryDocumentSnapshot) => ({
+            id: doc.id,
+            ...doc.data()
+          }));
 
-            return NextResponse.json({
-              success: true,
-              documents,
-              usedFallback: true
-            });
-          } catch (fallbackError) {
-            console.error('❌ Alternative admin also failed:', fallbackError);
-            // Continue to original error handling below
-          }
+          return NextResponse.json({
+            success: true,
+            documents
+          });
+        } catch (queryError) {
+          console.error('📂 Firestore query error:', queryError);
           
-          console.error('🔑 Re-checking private key format in production:');
-          
-          const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
-          if (privateKey) {
-            console.error('🔑 Production private key analysis:', {
-              length: privateKey.length,
-              hasEscapedNewlines: privateKey.includes('\\n'),
-              hasRealNewlines: privateKey.includes('\n'),
-              startsWithBegin: privateKey.startsWith('-----BEGIN'),
-              endsWithEnd: privateKey.endsWith('-----'),
-              firstNewlineAt: privateKey.indexOf('\n'),
-              firstEscapedAt: privateKey.indexOf('\\n'),
-              // Show first and last 50 chars
-              prefix: privateKey.substring(0, 50),
-              suffix: privateKey.substring(privateKey.length - 50)
-            });
+          // Final fallback to REST API if Admin SDK query fails
+          if (queryError instanceof Error && queryError.message.includes('DECODER routines::unsupported')) {
+            console.error('🔍 DECODER error during READ operation detected!');
+            console.error('🌐 Final fallback to REST API...');
             
-            // Try to decode a small portion to see if it's valid
             try {
-              const keyContent = privateKey
-                .replace('-----BEGIN PRIVATE KEY-----', '')
-                .replace('-----END PRIVATE KEY-----', '')
-                .replace(/\s/g, '');
-              const testDecode = Buffer.from(keyContent.substring(0, 40), 'base64');
-              console.error('🔓 Private key decode test in production:', 
-                Array.from(testDecode.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(' '));
-            } catch (decodeErr) {
-              console.error('❌ Private key decode failed in production:', decodeErr);
+              const documents = await queryFirestoreREST(userId);
+              
+              return NextResponse.json({
+                success: true,
+                documents,
+                usedRestFallback: true,
+                note: 'Used Firestore REST API to bypass serverless gRPC limitations'
+              });
+            } catch (restError) {
+              console.error('❌ REST API fallback also failed:', restError);
             }
           }
           
-          console.error('💡 Hypothesis: Private key works for writes but fails for reads in serverless environment');
-          console.error('💡 This could be due to different Node.js crypto implementations or memory constraints');
+          // Return more specific error information
+          return NextResponse.json({
+            error: 'Database query failed',
+            details: queryError instanceof Error ? queryError.message : 'Unknown error',
+            code: 'FIRESTORE_QUERY_ERROR',
+            isDecoderError: queryError instanceof Error && queryError.message.includes('DECODER routines::unsupported'),
+            troubleshooting: 'Check Vercel function logs for detailed diagnostics'
+          }, { status: 500 });
         }
-        
-        // Return more specific error information
-        return NextResponse.json({
-          error: 'Database query failed',
-          details: queryError instanceof Error ? queryError.message : 'Unknown error',
-          code: 'FIRESTORE_QUERY_ERROR',
-          isDecoderError: queryError instanceof Error && queryError.message.includes('DECODER routines::unsupported'),
-          troubleshooting: 'Check Vercel function logs for detailed diagnostics'
-        }, { status: 500 });
       }
     }
   } catch (error) {
     console.error('Error loading documents:', error);
     
-    // Return more detailed error information
+    // Enhanced error response with diagnostics
     const errorDetails = error instanceof Error ? {
       name: error.name,
       message: error.message,
       isDecoderError: error.message.includes('DECODER routines::unsupported'),
-      stack: error.stack?.substring(0, 300)
+      stack: error.stack?.substring(0, 500)
     } : { message: 'Unknown error' };
     
     return NextResponse.json({
