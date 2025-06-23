@@ -157,6 +157,8 @@ END_OF_DOC"""`;
 
     const startTime = Date.now();
 
+    console.log('🔄 Making OpenAI API request...');
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -180,6 +182,9 @@ END_OF_DOC"""`;
       }),
     });
 
+    console.log('📡 OpenAI API response status:', response.status);
+    console.log('📡 OpenAI API response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenAI API error:', response.status, errorText);
@@ -193,6 +198,15 @@ END_OF_DOC"""`;
     const duration = Date.now() - startTime;
 
     console.log(`✨ Smart Review completed in ${duration}ms`);
+    console.log('📊 OpenAI response structure:', {
+      hasChoices: !!data.choices,
+      choicesLength: data.choices?.length,
+      hasMessage: !!data.choices?.[0]?.message,
+      hasContent: !!data.choices?.[0]?.message?.content,
+      contentType: typeof data.choices?.[0]?.message?.content,
+      contentLength: data.choices?.[0]?.message?.content?.length,
+      usage: data.usage
+    });
 
     // Extract the JSON response from OpenAI
     const aiResponse = data.choices?.[0]?.message?.content;
@@ -204,6 +218,11 @@ END_OF_DOC"""`;
         { status: 500 }
       );
     }
+
+    console.log('🤖 AI Response type:', typeof aiResponse);
+    console.log('🤖 AI Response length:', aiResponse.length);
+    console.log('🤖 AI Response starts with:', aiResponse.substring(0, 100));
+    console.log('🤖 AI Response ends with:', aiResponse.substring(Math.max(0, aiResponse.length - 100)));
 
     try {
       const smartReview: SmartReview = JSON.parse(aiResponse);
@@ -233,9 +252,73 @@ END_OF_DOC"""`;
       return NextResponse.json(enhancedSmartReview);
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', parseError);
-      console.error('Raw response:', aiResponse);
+      console.error('Raw response (first 500 chars):', aiResponse?.substring(0, 500));
+      console.error('Raw response (last 500 chars):', aiResponse?.substring(Math.max(0, aiResponse.length - 500)));
+      
+      // Try to extract JSON if it's wrapped in markdown or other text
+      let cleanedResponse = aiResponse;
+      
+      // Remove markdown code blocks
+      if (aiResponse.includes('```json')) {
+        const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          cleanedResponse = jsonMatch[1].trim();
+          console.log('Extracted JSON from markdown:', cleanedResponse.substring(0, 200));
+        }
+      } else if (aiResponse.includes('```')) {
+        const jsonMatch = aiResponse.match(/```\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          cleanedResponse = jsonMatch[1].trim();
+          console.log('Extracted content from code block:', cleanedResponse.substring(0, 200));
+        }
+      }
+      
+      // Try to find JSON in the response
+      const jsonStart = cleanedResponse.indexOf('{');
+      const jsonEnd = cleanedResponse.lastIndexOf('}');
+      
+      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+        const extractedJson = cleanedResponse.substring(jsonStart, jsonEnd + 1);
+        console.log('Attempting to parse extracted JSON:', extractedJson.substring(0, 200));
+        
+        try {
+          const smartReview: SmartReview = JSON.parse(extractedJson);
+          
+          // Validate the response structure
+          if (!smartReview.issues || !smartReview.metrics || !smartReview.suggestions) {
+            console.error('Invalid extracted response structure:', smartReview);
+            throw new Error('Invalid extracted response structure');
+          }
+
+          // Add IDs and status to issues, and find their positions in the text
+          const enhancedIssues = smartReview.issues.map((issue, index) => {
+            const position = findTextPosition(content, issue.excerpt);
+            return {
+              ...issue,
+              id: `smart-review-issue-${index}-${Date.now()}`,
+              status: 'new' as const,
+              range: position
+            };
+          });
+
+          const enhancedSmartReview = {
+            ...smartReview,
+            issues: enhancedIssues
+          };
+
+          console.log('✅ Successfully parsed extracted JSON');
+          return NextResponse.json(enhancedSmartReview);
+        } catch (extractedParseError) {
+          console.error('Failed to parse extracted JSON:', extractedParseError);
+        }
+      }
+      
       return NextResponse.json(
-        { error: 'Failed to parse AI response' },
+        { 
+          error: 'Failed to parse AI response', 
+          details: parseError instanceof Error ? parseError.message : 'Unknown parse error',
+          responsePreview: aiResponse?.substring(0, 200) || 'No response'
+        },
         { status: 500 }
       );
     }
