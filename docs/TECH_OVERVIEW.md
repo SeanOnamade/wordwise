@@ -164,7 +164,7 @@ This creates a feedback loop where the system becomes more accurate and relevant
 ## Platform Integration Strategy
 
 ### Current Integration: HTML Clipboard
-- **Copy as HTML**: Clean HTML export to clipboard for universal compatibility
+- **Copy as Markdown**: Clean Markdown export to clipboard for universal compatibility
 - **Target Applications**: Google Docs, Microsoft Word, Notion, email clients
 - **Data Format**: Standardized HTML with minimal styling for maximum compatibility
 

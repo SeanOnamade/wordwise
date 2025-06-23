@@ -169,14 +169,16 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
   }
 
   return (
-    <div className="h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       {/* Sidebar */}
-      <Sidebar />
+      <div className="w-64 flex-shrink-0 bg-slate-900 border-r border-white/10 flex flex-col">
+        <Sidebar />
+      </div>
 
       {/* Main Editor Area */}
-      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-900 to-slate-800">
+      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-900 to-slate-800 overflow-hidden">
         {/* Editor Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-white/5 backdrop-blur-md border-b border-white/10">
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 bg-white/5 backdrop-blur-md border-b border-white/10">
           <div className="flex-1">
             <input
               type="text"
@@ -268,9 +270,10 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
         </div>
 
         {/* Editor Area */}
-        <div className="flex-1 flex">
-          <div className="flex-1 overflow-auto">
-            <div className="max-w-4xl mx-auto">
+        <div className="flex-1 flex overflow-hidden">
+          {/* Main Editor Content */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-4xl mx-auto py-8 px-6">
               <TipTapEditor
                 content={currentDoc?.content || ''}
                 suggestions={suggestions}
@@ -285,7 +288,7 @@ export default function EditorShell({ user, onSignOut }: EditorShellProps) {
           </div>
 
           {/* Right Sidebar - Smart Review or Suggestions */}
-          <div className="w-80 border-l border-white/10">
+          <div className="w-80 flex-shrink-0 border-l border-white/10 overflow-y-auto">
             {smartReview.isOpen ? (
               <SmartReviewDrawer 
                 editor={editorInstance}

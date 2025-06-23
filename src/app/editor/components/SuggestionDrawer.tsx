@@ -140,14 +140,14 @@ export default function SuggestionDrawer({ editor, isLoading = false, onSuggesti
   return (
     <div className="h-full flex flex-col bg-transparent backdrop-blur-md">
       {/* Header */}
-      <div className="border-b border-white/10 bg-white/5 backdrop-blur-md sticky top-0 z-10">
+      <div className="flex-shrink-0 border-b border-white/10 bg-white/5 backdrop-blur-md z-10">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-100">
               Writing Suggestions
             </h3>
             {visible.length > 0 && (
-              <Badge variant="secondary" className="text-xs bg-indigo-500 text-white">
+              <Badge variant="secondary" className="text-xs bg-indigo-500/90 text-white backdrop-blur-sm">
                 {visible.length}
               </Badge>
             )}
@@ -156,26 +156,26 @@ export default function SuggestionDrawer({ editor, isLoading = false, onSuggesti
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
         <div className="p-4">
           {isLoading ? (
             /* Loading State */
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-white/5 rounded-lg p-4 animate-pulse">
-                  <div className="h-4 bg-slate-600 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-slate-600 rounded w-1/2 mb-4"></div>
+                <div key={i} className="bg-white/5 backdrop-blur-sm rounded-lg p-4 animate-pulse">
+                  <div className="h-4 bg-slate-600/50 rounded w-3/4 mb-2"></div>
+                  <div className="h-3 bg-slate-600/50 rounded w-1/2 mb-4"></div>
                   <div className="flex space-x-2">
-                    <div className="h-8 bg-slate-600 rounded w-20"></div>
-                    <div className="h-8 bg-slate-600 rounded w-20"></div>
+                    <div className="h-8 bg-slate-600/50 rounded w-20"></div>
+                    <div className="h-8 bg-slate-600/50 rounded w-20"></div>
                   </div>
                 </div>
               ))}
             </div>
           ) : visible.length === 0 ? (
             /* Empty State */
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+              <div className="w-16 h-16 bg-green-500/20 backdrop-blur-sm rounded-full flex items-center justify-center mb-4 animate-pulse">
                 <svg 
                   className="w-8 h-8 text-green-400" 
                   fill="none" 
@@ -190,16 +190,19 @@ export default function SuggestionDrawer({ editor, isLoading = false, onSuggesti
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-slate-400 mb-2">
+              <h3 className="text-lg font-medium text-slate-300 mb-2">
                 All Clear!
               </h3>
               <p className="text-sm text-slate-400 max-w-xs">
                 Your writing looks great! No suggestions at the moment.
               </p>
+              <div className="mt-6 text-xs text-slate-500">
+                Start typing to get real-time suggestions
+              </div>
             </div>
           ) : (
             /* Suggestions List */
-            <div className="space-y-4">
+            <div className="space-y-4 pb-4">
               {visible.map((suggestion) => (
                 <SuggestionCard
                   key={suggestion.id}

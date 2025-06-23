@@ -63,8 +63,7 @@ const createDecorations = (doc: any, suggestions: Suggestion[]): DecorationSet =
     
     // Ensure range is within document bounds
     from = Math.max(0, from);
-    // Add 2 extra characters to the end of every highlight for better coverage
-    to = Math.min(doc.content.size, to + 2);
+    to = Math.min(doc.content.size, to);
     
     // For smart review suggestions, adjust the range to include the full word
     if (type === 'smart') {
@@ -104,6 +103,40 @@ const createDecorations = (doc: any, suggestions: Suggestion[]): DecorationSet =
 // Create optimized suggestion highlight plugin for grammar suggestions
 const createGrammarHighlightPlugin = () => {
   let currentSuggestions: Suggestion[] = [];
+  let recalculateTimeout: NodeJS.Timeout | null = null;
+  
+  const recalculatePositions = (doc: any, suggestions: Suggestion[]) => {
+    if (!suggestions?.length) return suggestions;
+    
+    return suggestions.map(suggestion => {
+      const { range, type, id, status } = suggestion;
+      if (status !== 'new') return suggestion;
+      
+      let { from, to } = range;
+      const text = doc.textBetween(0, doc.content.size);
+      
+      // Get the text of the original suggestion
+      const originalText = doc.textBetween(from, to);
+      
+      // Find this text in the document starting from the original position
+      const searchStartPos = Math.max(0, from - 100); // Look back up to 100 chars
+      const searchEndPos = Math.min(doc.content.size, to + 100); // Look forward up to 100 chars
+      const searchArea = doc.textBetween(searchStartPos, searchEndPos);
+      
+      // Find the text in the search area
+      const relativePos = searchArea.indexOf(originalText);
+      if (relativePos !== -1) {
+        // Adjust positions based on the found text
+        from = searchStartPos + relativePos;
+        to = from + originalText.length;
+      }
+      
+      return {
+        ...suggestion,
+        range: { from, to }
+      };
+    });
+  };
   
   return new Plugin({
     key: new PluginKey('grammarHighlight'),
@@ -119,7 +152,7 @@ const createGrammarHighlightPlugin = () => {
           return createDecorations(tr.doc, currentSuggestions);
         }
 
-        // Handle suggestion dismissal - just remove, no range updates
+        // Handle suggestion dismissal
         const dismissedInfo = tr.getMeta('dismissedSuggestion');
         if (dismissedInfo) {
           const { id } = dismissedInfo;
@@ -129,6 +162,27 @@ const createGrammarHighlightPlugin = () => {
 
         // For force updates
         if (tr.getMeta('forceUpdate')) {
+          return createDecorations(tr.doc, currentSuggestions);
+        }
+
+        // If there are document changes, debounce recalculation
+        if (tr.docChanged) {
+          if (recalculateTimeout) {
+            clearTimeout(recalculateTimeout);
+          }
+          
+          recalculateTimeout = setTimeout(() => {
+            const updatedSuggestions = recalculatePositions(tr.doc, currentSuggestions);
+            currentSuggestions = updatedSuggestions;
+            
+            // Force a decoration update
+            const state = tr.state;
+            const newTr = state.tr;
+            newTr.setMeta('forceUpdate', true);
+            state.view?.dispatch(newTr);
+          }, 2000); // 2 second debounce
+          
+          // Return current decorations for now
           return createDecorations(tr.doc, currentSuggestions);
         }
 
@@ -146,6 +200,40 @@ const createGrammarHighlightPlugin = () => {
 // Create optimized suggestion highlight plugin for smart review suggestions
 const createSmartReviewHighlightPlugin = () => {
   let currentSuggestions: Suggestion[] = [];
+  let recalculateTimeout: NodeJS.Timeout | null = null;
+  
+  const recalculatePositions = (doc: any, suggestions: Suggestion[]) => {
+    if (!suggestions?.length) return suggestions;
+    
+    return suggestions.map(suggestion => {
+      const { range, type, id, status } = suggestion;
+      if (status !== 'new') return suggestion;
+      
+      let { from, to } = range;
+      const text = doc.textBetween(0, doc.content.size);
+      
+      // Get the text of the original suggestion
+      const originalText = doc.textBetween(from, to);
+      
+      // Find this text in the document starting from the original position
+      const searchStartPos = Math.max(0, from - 100); // Look back up to 100 chars
+      const searchEndPos = Math.min(doc.content.size, to + 100); // Look forward up to 100 chars
+      const searchArea = doc.textBetween(searchStartPos, searchEndPos);
+      
+      // Find the text in the search area
+      const relativePos = searchArea.indexOf(originalText);
+      if (relativePos !== -1) {
+        // Adjust positions based on the found text
+        from = searchStartPos + relativePos;
+        to = from + originalText.length;
+      }
+      
+      return {
+        ...suggestion,
+        range: { from, to }
+      };
+    });
+  };
   
   return new Plugin({
     key: new PluginKey('smartReviewHighlight'),
@@ -161,7 +249,7 @@ const createSmartReviewHighlightPlugin = () => {
           return createDecorations(tr.doc, currentSuggestions);
         }
 
-        // Handle suggestion dismissal - just remove, no range updates
+        // Handle suggestion dismissal
         const dismissedInfo = tr.getMeta('dismissedSuggestion');
         if (dismissedInfo) {
           const { id } = dismissedInfo;
@@ -171,6 +259,27 @@ const createSmartReviewHighlightPlugin = () => {
 
         // For force updates
         if (tr.getMeta('forceUpdate') || tr.getMeta('smartReviewSuggestionsChanged')) {
+          return createDecorations(tr.doc, currentSuggestions);
+        }
+
+        // If there are document changes, debounce recalculation
+        if (tr.docChanged) {
+          if (recalculateTimeout) {
+            clearTimeout(recalculateTimeout);
+          }
+          
+          recalculateTimeout = setTimeout(() => {
+            const updatedSuggestions = recalculatePositions(tr.doc, currentSuggestions);
+            currentSuggestions = updatedSuggestions;
+            
+            // Force a decoration update
+            const state = tr.state;
+            const newTr = state.tr;
+            newTr.setMeta('forceUpdate', true);
+            state.view?.dispatch(newTr);
+          }, 2000); // 2 second debounce
+          
+          // Return current decorations for now
           return createDecorations(tr.doc, currentSuggestions);
         }
 

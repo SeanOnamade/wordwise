@@ -72,7 +72,7 @@ export default function CopyHTMLButton({ editor, className = '' }: CopyHTMLButto
       ) : (
         <>
           <span className="mr-2">📋</span>
-          Copy as HTML
+          Copy as Markdown
         </>
       )}
     </Button>

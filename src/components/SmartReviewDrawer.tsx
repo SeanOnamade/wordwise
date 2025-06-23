@@ -99,7 +99,7 @@ export default function SmartReviewDrawer({ editor, onClose }: SmartReviewDrawer
   if (smartReview.loading) {
     return (
       <div className="h-full flex flex-col bg-transparent backdrop-blur-md">
-        <div className="border-b border-white/10 bg-white/5 backdrop-blur-md sticky top-0 z-10">
+        <div className="flex-shrink-0 border-b border-white/10 bg-white/5 backdrop-blur-md z-10">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
@@ -117,59 +117,59 @@ export default function SmartReviewDrawer({ editor, onClose }: SmartReviewDrawer
             </div>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
           <div className="p-4 space-y-6">
             <div className="space-y-4">
               {/* Metrics Loading */}
-              <div className="bg-white/5 rounded-lg p-4 animate-pulse">
-                <div className="h-5 bg-slate-600 rounded w-1/4 mb-6"></div>
+              <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 animate-pulse">
+                <div className="h-5 bg-slate-600/50 rounded w-1/4 mb-6"></div>
                 <div className="space-y-6">
                   {/* Clarity */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <div className="h-4 bg-slate-600 rounded w-20"></div>
-                      <div className="h-4 bg-slate-600 rounded w-12"></div>
+                      <div className="h-4 bg-slate-600/50 rounded w-20"></div>
+                      <div className="h-4 bg-slate-600/50 rounded w-12"></div>
                     </div>
-                    <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
                       <div className="h-full bg-purple-600/30 rounded-full w-3/4 animate-pulse"></div>
                     </div>
-                    <div className="h-3 bg-slate-600 rounded w-full"></div>
+                    <div className="h-3 bg-slate-600/50 rounded w-full"></div>
                   </div>
                   {/* Academic Tone */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <div className="h-4 bg-slate-600 rounded w-24"></div>
-                      <div className="h-4 bg-slate-600 rounded w-12"></div>
+                      <div className="h-4 bg-slate-600/50 rounded w-24"></div>
+                      <div className="h-4 bg-slate-600/50 rounded w-12"></div>
                     </div>
-                    <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
                       <div className="h-full bg-purple-600/30 rounded-full w-1/2 animate-pulse"></div>
                     </div>
-                    <div className="h-3 bg-slate-600 rounded w-full"></div>
+                    <div className="h-3 bg-slate-600/50 rounded w-full"></div>
                   </div>
                   {/* Sentence Complexity */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <div className="h-4 bg-slate-600 rounded w-32"></div>
-                      <div className="h-4 bg-slate-600 rounded w-12"></div>
+                      <div className="h-4 bg-slate-600/50 rounded w-32"></div>
+                      <div className="h-4 bg-slate-600/50 rounded w-12"></div>
                     </div>
-                    <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
                       <div className="h-full bg-purple-600/30 rounded-full w-2/3 animate-pulse"></div>
                     </div>
-                    <div className="h-3 bg-slate-600 rounded w-full"></div>
+                    <div className="h-3 bg-slate-600/50 rounded w-full"></div>
                   </div>
                 </div>
               </div>
               {/* Issues Loading */}
-              <div className="bg-white/5 rounded-lg p-4 animate-pulse">
-                <div className="h-5 bg-slate-600 rounded w-1/4 mb-6"></div>
+              <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 animate-pulse">
+                <div className="h-5 bg-slate-600/50 rounded w-1/4 mb-6"></div>
                 <div className="space-y-4">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-white/5 rounded-lg p-4">
+                    <div key={i} className="bg-white/5 backdrop-blur-sm rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <div className="h-4 w-4 rounded-full bg-purple-600/30 animate-pulse"></div>
-                        <div className="h-4 bg-slate-600 rounded w-3/4"></div>
+                        <div className="h-4 bg-slate-600/50 rounded w-3/4"></div>
                       </div>
-                      <div className="h-3 bg-slate-600 rounded w-full"></div>
+                      <div className="h-3 bg-slate-600/50 rounded w-full"></div>
                     </div>
                   ))}
                 </div>
@@ -185,7 +185,7 @@ export default function SmartReviewDrawer({ editor, onClose }: SmartReviewDrawer
   if (smartReview.error) {
     return (
       <div className="h-full flex flex-col bg-transparent backdrop-blur-md">
-        <div className="border-b border-white/10 bg-white/5 backdrop-blur-md sticky top-0 z-10">
+        <div className="flex-shrink-0 border-b border-white/10 bg-white/5 backdrop-blur-md z-10">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
@@ -203,14 +203,26 @@ export default function SmartReviewDrawer({ editor, onClose }: SmartReviewDrawer
             </div>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
           <div className="p-4">
-            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+            <div className="bg-red-500/10 backdrop-blur-sm border border-red-500/20 rounded-lg p-4">
               <div className="flex items-center gap-2 text-red-400 mb-2">
                 <AlertCircle className="w-4 h-4" />
                 <span className="font-medium">Error</span>
               </div>
               <p className="text-sm text-red-300">{smartReview.error}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSmartReviewError(undefined);
+                  setSmartReviewLoading(false);
+                  closeSmartReview();
+                }}
+                className="mt-4 text-red-400 hover:text-red-300"
+              >
+                Try Again
+              </Button>
             </div>
           </div>
         </div>
@@ -224,7 +236,7 @@ export default function SmartReviewDrawer({ editor, onClose }: SmartReviewDrawer
   return (
     <div className="h-full flex flex-col bg-transparent backdrop-blur-md">
       {/* Header */}
-      <div className="border-b border-white/10 bg-white/5 backdrop-blur-md sticky top-0 z-10">
+      <div className="flex-shrink-0 border-b border-white/10 bg-white/5 backdrop-blur-md z-10">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
@@ -244,10 +256,10 @@ export default function SmartReviewDrawer({ editor, onClose }: SmartReviewDrawer
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
         <div className="p-4 space-y-6">
           {/* Metrics Section */}
-          <div className="bg-white/5 rounded-lg p-4">
+          <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 hover:bg-white/10 transition-colors duration-200">
             <h4 className="text-sm font-medium text-slate-200 mb-4 flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
               Writing Metrics
@@ -259,7 +271,7 @@ export default function SmartReviewDrawer({ editor, onClose }: SmartReviewDrawer
                   <h3 className="text-sm font-medium">Clarity</h3>
                   <span className="text-sm text-slate-400">{smartReview.data.metrics.clarity.score}/100</span>
                 </div>
-                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-500"
                     style={{ width: `${smartReview.data.metrics.clarity.score}%` }}
@@ -274,7 +286,7 @@ export default function SmartReviewDrawer({ editor, onClose }: SmartReviewDrawer
                   <h3 className="text-sm font-medium">Academic Tone</h3>
                   <span className="text-sm text-slate-400">{smartReview.data.metrics.academic_tone.score}/100</span>
                 </div>
-                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-500"
                     style={{ width: `${smartReview.data.metrics.academic_tone.score}%` }}
@@ -289,7 +301,7 @@ export default function SmartReviewDrawer({ editor, onClose }: SmartReviewDrawer
                   <h3 className="text-sm font-medium">Sentence Complexity</h3>
                   <span className="text-sm text-slate-400">{smartReview.data.metrics.sentence_complexity.score}/100</span>
                 </div>
-                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-500"
                     style={{ width: `${smartReview.data.metrics.sentence_complexity.score}%` }}
@@ -302,14 +314,19 @@ export default function SmartReviewDrawer({ editor, onClose }: SmartReviewDrawer
 
           {/* Issues Section */}
           {smartReview.data.issues.length > 0 && (
-            <div className="bg-white/5 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-slate-200 mb-4 flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                Writing Issues
-              </h4>
+            <div className="bg-white/5 backdrop-blur-sm rounded-lg p-4 hover:bg-white/10 transition-colors duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-medium text-slate-200 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Writing Issues
+                </h4>
+                <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  {smartReview.data.issues.length}
+                </Badge>
+              </div>
               <div className="space-y-4">
                 {smartReview.data.issues.map((issue) => (
-                  <div key={issue.id} className="bg-white/5 rounded-lg p-4">
+                  <div key={issue.id} className="bg-white/5 backdrop-blur-sm rounded-lg p-4 hover:bg-white/10 transition-colors duration-200">
                     <div className="flex items-center gap-2 mb-2">
                       <AlertCircle className="w-4 h-4 text-purple-400" />
                       <p className="text-sm font-medium text-slate-200">{issue.excerpt}</p>
