@@ -3,11 +3,39 @@ import { SmartReview } from '@/types/SmartReview';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+// Structured logging function with prefix for easy grepping in Vercel logs
+function log(...args: any[]) {
+  console.log('[smart-review]', ...args);
+}
+
+function logError(...args: any[]) {
+  console.error('[smart-review] ❌', ...args);
+}
+
+function logInfo(...args: any[]) {
+  console.info('[smart-review] ℹ️', ...args);
+}
+
+function logDebug(...args: any[]) {
+  console.debug('[smart-review] 🔍', ...args);
+}
+
+function logSuccess(...args: any[]) {
+  console.log('[smart-review] ✅', ...args);
+}
+
+function logWarning(...args: any[]) {
+  console.warn('[smart-review] ⚠️', ...args);
+}
+
 // Function to find the position of excerpt in the document
 function findTextPosition(content: string, excerpt: string): { from: number; to: number } | undefined {
+  logDebug('Finding text position for excerpt:', excerpt.substring(0, 50) + '...');
+  
   // Try exact match first
   let index = content.indexOf(excerpt);
   if (index !== -1) {
+    logDebug('Found exact match at position:', index);
     return {
       from: index,
       to: index + excerpt.length
@@ -17,6 +45,7 @@ function findTextPosition(content: string, excerpt: string): { from: number; to:
   // Try case-insensitive match
   index = content.toLowerCase().indexOf(excerpt.toLowerCase());
   if (index !== -1) {
+    logDebug('Found case-insensitive match at position:', index);
     // Find the actual text in the original content
     const actualExcerpt = content.slice(index, index + excerpt.length);
     return {
@@ -33,11 +62,17 @@ function findTextPosition(content: string, excerpt: string): { from: number; to:
     
     // Find positions in content
     let startIndex = content.toLowerCase().indexOf(firstWord.toLowerCase());
-    if (startIndex === -1) return undefined;
+    if (startIndex === -1) {
+      logWarning('Could not find first word in fuzzy match:', firstWord);
+      return undefined;
+    }
     
     // Look for the last word after the first word
     let endIndex = content.toLowerCase().indexOf(lastWord.toLowerCase(), startIndex);
-    if (endIndex === -1) return undefined;
+    if (endIndex === -1) {
+      logWarning('Could not find last word in fuzzy match:', lastWord);
+      return undefined;
+    }
     
     // Get the actual text from the content
     const actualText = content.slice(startIndex, endIndex + lastWord.length);
@@ -48,6 +83,7 @@ function findTextPosition(content: string, excerpt: string): { from: number; to:
     
     // Only use this match if it's reasonably similar
     if (cleanActual.includes(cleanExpected) || cleanExpected.includes(cleanActual)) {
+      logDebug('Found fuzzy match at position:', startIndex);
       return {
         from: startIndex,
         to: endIndex + lastWord.length
@@ -60,6 +96,7 @@ function findTextPosition(content: string, excerpt: string): { from: number; to:
   const normalizedExcerpt = excerpt.replace(/\s+/g, ' ');
   index = normalizedContent.indexOf(normalizedExcerpt);
   if (index !== -1) {
+    logDebug('Found normalized whitespace match');
     // Map the position back to the original content
     let originalIndex = 0;
     let normalizedIndex = 0;
@@ -90,49 +127,81 @@ function findTextPosition(content: string, excerpt: string): { from: number; to:
     };
   }
   
+  logWarning('No text position found for excerpt:', excerpt.substring(0, 50) + '...');
   return undefined;
 }
 
 export async function POST(request: Request) {
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const startTime = Date.now();
+  
+  log(`🚀 Starting request ${requestId}`);
+  
   try {
+    // Environment diagnostics
+    logInfo('Environment check:', {
+      hasOpenAIKey: !!OPENAI_API_KEY,
+      keyLength: OPENAI_API_KEY?.length || 0,
+      keyPrefix: OPENAI_API_KEY?.substring(0, 7) || 'none',
+      nodeEnv: process.env.NODE_ENV,
+      vercelEnv: process.env.VERCEL_ENV,
+      runtime: process.env.VERCEL_REGION || 'local'
+    });
+
     // Check for OpenAI API key first
     if (!OPENAI_API_KEY) {
-      console.error('❌ Missing OpenAI API key');
+      logError('Missing OpenAI API key');
       return NextResponse.json(
-        { error: 'Missing key' },
+        { error: 'Missing key', requestId },
         { status: 500 }
       );
     }
 
     let content: string;
+    let requestBody: any;
     
     try {
-      const body = await request.json();
-      content = body.content;
+      const bodyText = await request.text();
+      logDebug('Request body length:', bodyText.length);
+      
+      requestBody = JSON.parse(bodyText);
+      content = requestBody.content;
+      
+      logInfo('Request parsed successfully:', {
+        contentLength: content?.length || 0,
+        contentType: typeof content,
+        hasContent: !!content
+      });
     } catch (parseError) {
-      console.error('❌ Failed to parse request body:', parseError);
+      logError('Failed to parse request body:', parseError);
       return NextResponse.json(
-        { error: 'Invalid JSON in request body' },
+        { error: 'Invalid JSON in request body', requestId },
         { status: 400 }
       );
     }
 
     if (!content || typeof content !== 'string') {
-      console.error('❌ Invalid content provided:', typeof content);
+      logError('Invalid content provided:', { type: typeof content, hasContent: !!content });
       return NextResponse.json(
-        { error: 'Content is required and must be a string' },
+        { error: 'Content is required and must be a string', requestId },
         { status: 400 }
       );
     }
 
     // Check content length (reasonable limit for API)
     if (content.length > 50000) {
-      console.error('❌ Content too long:', content.length);
+      logError('Content too long:', content.length);
       return NextResponse.json(
-        { error: 'Content too long. Please limit to 50,000 characters.' },
+        { error: 'Content too long. Please limit to 50,000 characters.', requestId },
         { status: 400 }
       );
     }
+
+    logInfo('Content validation passed:', {
+      length: content.length,
+      wordCount: content.split(/\s+/).length,
+      preview: content.substring(0, 100) + '...'
+    });
 
     const systemPrompt = `You are WordWise, an academic-writing coach for ESL graduate students. Return concise, actionable feedback. Never change voice; never reveal chain-of-thought.`;
 
@@ -170,14 +239,13 @@ The user is an ESL graduate student writing academic English. They value clarity
 ${content}
 END_OF_DOC"""`;
 
-    const startTime = Date.now();
-
-    console.log('🔄 Making OpenAI API request...');
+    const openaiStartTime = Date.now();
+    log('🔄 Making OpenAI API request...');
     
     // Create AbortController with 28s timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.error('❌ OpenAI API request timed out after 28s');
+      logError('OpenAI API request timed out after 28s');
       controller.abort();
     }, 28000);
 
@@ -185,97 +253,170 @@ END_OF_DOC"""`;
     let data: any;
 
     try {
+      const requestPayload = {
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: userPrompt,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 2000,
+      };
+
+      logDebug('OpenAI request payload:', {
+        model: requestPayload.model,
+        messageCount: requestPayload.messages.length,
+        systemPromptLength: systemPrompt.length,
+        userPromptLength: userPrompt.length,
+        temperature: requestPayload.temperature,
+        maxTokens: requestPayload.max_tokens
+      });
+
       response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt,
-            },
-            {
-              role: 'user',
-              content: userPrompt,
-            },
-          ],
-          temperature: 0.3,
-          max_tokens: 2000,
-        }),
+        body: JSON.stringify(requestPayload),
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
+      const openaiDuration = Date.now() - openaiStartTime;
 
-      console.log('📡 OpenAI API response status:', response.status);
+      logInfo('OpenAI API response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        duration: `${openaiDuration}ms`,
+        headers: {
+          contentType: response.headers.get('content-type'),
+          contentLength: response.headers.get('content-length'),
+          ratelimitRemaining: response.headers.get('x-ratelimit-remaining-requests'),
+          ratelimitReset: response.headers.get('x-ratelimit-reset-requests')
+        }
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ OpenAI API error:', response.status, errorText);
+        logError('OpenAI API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+          duration: `${openaiDuration}ms`
+        });
         return NextResponse.json(
-          { error: `OpenAI API error: ${response.status} - ${errorText}` },
+          { error: `OpenAI API error: ${response.status} - ${errorText}`, requestId },
           { status: response.status }
         );
       }
 
       data = await response.json();
+      
+      logInfo('OpenAI response structure:', {
+        hasChoices: !!data.choices,
+        choicesLength: data.choices?.length,
+        hasMessage: !!data.choices?.[0]?.message,
+        hasContent: !!data.choices?.[0]?.message?.content,
+        finishReason: data.choices?.[0]?.finish_reason,
+        usage: data.usage
+      });
+
     } catch (fetchError) {
       clearTimeout(timeoutId);
+      const openaiDuration = Date.now() - openaiStartTime;
       
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        console.error('❌ OpenAI API request aborted due to timeout');
+        logError('OpenAI API request aborted due to timeout:', { duration: `${openaiDuration}ms` });
         return NextResponse.json(
-          { error: 'Request timed out. Please try again with shorter content.' },
+          { error: 'Request timed out. Please try again with shorter content.', requestId },
           { status: 408 }
         );
       }
       
-      console.error('❌ OpenAI API fetch error:', fetchError);
+      logError('OpenAI API fetch error:', {
+        error: fetchError,
+        duration: `${openaiDuration}ms`,
+        name: fetchError instanceof Error ? fetchError.name : 'unknown',
+        message: fetchError instanceof Error ? fetchError.message : 'unknown'
+      });
       return NextResponse.json(
-        { error: 'Failed to connect to OpenAI API' },
+        { error: 'Failed to connect to OpenAI API', requestId },
         { status: 502 }
       );
     }
-
-    const duration = Date.now() - startTime;
-    console.log(`✨ Smart Review completed in ${duration}ms`);
 
     // Extract the JSON response from OpenAI
     const aiResponse = data.choices?.[0]?.message?.content;
     
     if (!aiResponse) {
-      console.error('❌ No response content from OpenAI:', data);
+      logError('No response content from OpenAI:', {
+        choices: data.choices,
+        hasChoices: !!data.choices,
+        choicesLength: data.choices?.length
+      });
       return NextResponse.json(
-        { error: 'No response from OpenAI' },
+        { error: 'No response from OpenAI', requestId },
         { status: 500 }
       );
     }
 
-    console.log('🤖 AI Response length:', aiResponse.length);
-    console.log('🤖 AI Response starts with:', aiResponse.substring(0, 100));
+    logInfo('AI response received:', {
+      length: aiResponse.length,
+      type: typeof aiResponse,
+      startsWithBrace: aiResponse.trim().startsWith('{'),
+      endsWithBrace: aiResponse.trim().endsWith('}'),
+      preview: aiResponse.substring(0, 200) + '...'
+    });
 
     try {
       const smartReview: SmartReview = JSON.parse(aiResponse);
       
+      logDebug('Initial JSON parse successful');
+      
       // Validate the response structure
       if (!smartReview.issues || !smartReview.metrics || !smartReview.suggestions) {
-        console.error('❌ Invalid response structure:', smartReview);
+        logError('Invalid response structure:', {
+          hasIssues: !!smartReview.issues,
+          hasMetrics: !!smartReview.metrics,
+          hasSuggestions: !!smartReview.suggestions,
+          issuesType: typeof smartReview.issues,
+          metricsType: typeof smartReview.metrics,
+          suggestionsType: typeof smartReview.suggestions
+        });
         return NextResponse.json(
-          { error: 'Invalid response structure from AI' },
+          { error: 'Invalid response structure from AI', requestId },
           { status: 500 }
         );
       }
 
+      logInfo('Response structure validation passed:', {
+        issuesCount: smartReview.issues.length,
+        metricsKeys: Object.keys(smartReview.metrics),
+        suggestionsCount: smartReview.suggestions.length
+      });
+
       // Add IDs and status to issues, and find their positions in the text
       const enhancedIssues = smartReview.issues.map((issue, index) => {
         const position = findTextPosition(content, issue.excerpt);
+        const issueId = `smart-review-issue-${index}-${Date.now()}`;
+        
+        logDebug(`Processing issue ${index + 1}:`, {
+          id: issueId,
+          excerpt: issue.excerpt.substring(0, 50) + '...',
+          hasPosition: !!position,
+          position
+        });
+        
         return {
           ...issue,
-          id: `smart-review-issue-${index}-${Date.now()}`,
+          id: issueId,
           status: 'new' as const,
           range: position
         };
@@ -286,10 +427,31 @@ END_OF_DOC"""`;
         issues: enhancedIssues
       };
 
-      return NextResponse.json(enhancedSmartReview);
+      const totalDuration = Date.now() - startTime;
+      
+      logSuccess('Smart review completed successfully:', {
+        requestId,
+        totalDuration: `${totalDuration}ms`,
+        issuesProcessed: enhancedIssues.length,
+        issuesWithPositions: enhancedIssues.filter(i => i.range).length,
+        metrics: Object.keys(smartReview.metrics).map(key => ({
+          [key]: smartReview.metrics[key as keyof typeof smartReview.metrics].score
+        }))
+      });
+
+      return NextResponse.json({
+        ...enhancedSmartReview,
+        requestId,
+        processingTime: totalDuration
+      });
+      
     } catch (parseError) {
-      console.error('❌ Failed to parse OpenAI response:', parseError);
-      console.error('Raw response (first 500 chars):', aiResponse?.substring(0, 500));
+      logError('Failed to parse OpenAI response as JSON:', {
+        error: parseError,
+        responseLength: aiResponse.length,
+        responseStart: aiResponse.substring(0, 200),
+        responseEnd: aiResponse.substring(Math.max(0, aiResponse.length - 200))
+      });
       
       // Try to extract JSON if it's wrapped in markdown or other text
       let cleanedResponse = aiResponse;
@@ -299,13 +461,13 @@ END_OF_DOC"""`;
         const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/);
         if (jsonMatch) {
           cleanedResponse = jsonMatch[1].trim();
-          console.log('🔄 Extracted JSON from markdown');
+          logInfo('Extracted JSON from markdown code block');
         }
       } else if (aiResponse.includes('```')) {
         const jsonMatch = aiResponse.match(/```\s*([\s\S]*?)\s*```/);
         if (jsonMatch) {
           cleanedResponse = jsonMatch[1].trim();
-          console.log('🔄 Extracted content from code block');
+          logInfo('Extracted content from generic code block');
         }
       }
       
@@ -315,16 +477,24 @@ END_OF_DOC"""`;
       
       if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
         const extractedJson = cleanedResponse.substring(jsonStart, jsonEnd + 1);
-        console.log('🔄 Attempting to parse extracted JSON');
+        logInfo('Attempting to parse extracted JSON:', {
+          originalLength: aiResponse.length,
+          extractedLength: extractedJson.length,
+          extractedStart: extractedJson.substring(0, 100)
+        });
         
         try {
           const smartReview: SmartReview = JSON.parse(extractedJson);
           
           // Validate the response structure
           if (!smartReview.issues || !smartReview.metrics || !smartReview.suggestions) {
-            console.error('❌ Invalid extracted response structure:', smartReview);
+            logError('Invalid extracted response structure:', {
+              hasIssues: !!smartReview.issues,
+              hasMetrics: !!smartReview.metrics,
+              hasSuggestions: !!smartReview.suggestions
+            });
             return NextResponse.json(
-              { error: 'Invalid extracted response structure from AI' },
+              { error: 'Invalid extracted response structure from AI', requestId },
               { status: 500 }
             );
           }
@@ -345,27 +515,54 @@ END_OF_DOC"""`;
             issues: enhancedIssues
           };
 
-          console.log('✅ Successfully parsed extracted JSON');
-          return NextResponse.json(enhancedSmartReview);
+          const totalDuration = Date.now() - startTime;
+          
+          logSuccess('Smart review completed successfully (after JSON extraction):', {
+            requestId,
+            totalDuration: `${totalDuration}ms`,
+            issuesProcessed: enhancedIssues.length
+          });
+
+          return NextResponse.json({
+            ...enhancedSmartReview,
+            requestId,
+            processingTime: totalDuration
+          });
         } catch (extractedParseError) {
-          console.error('❌ Failed to parse extracted JSON:', extractedParseError);
+          logError('Failed to parse extracted JSON:', {
+            error: extractedParseError,
+            extractedLength: extractedJson.length,
+            extractedPreview: extractedJson.substring(0, 200)
+          });
         }
       }
       
       return NextResponse.json(
         { 
           error: 'Failed to parse AI response', 
-          details: parseError instanceof Error ? parseError.message : 'Unknown parse error'
+          details: parseError instanceof Error ? parseError.message : 'Unknown parse error',
+          requestId
         },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('❌ Smart Review API critical error:', error);
+    const totalDuration = Date.now() - startTime;
+    
+    logError('Smart Review API critical error:', {
+      requestId,
+      error,
+      duration: `${totalDuration}ms`,
+      name: error instanceof Error ? error.name : 'unknown',
+      message: error instanceof Error ? error.message : 'unknown',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
     return NextResponse.json(
       { 
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        requestId
       },
       { status: 500 }
     );
