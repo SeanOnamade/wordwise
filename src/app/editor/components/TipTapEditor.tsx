@@ -113,7 +113,6 @@ const createGrammarHighlightPlugin = () => {
       if (status !== 'new') return suggestion;
       
       let { from, to } = range;
-      const text = doc.textBetween(0, doc.content.size);
       
       // Get the text of the original suggestion
       const originalText = doc.textBetween(from, to);
@@ -175,11 +174,13 @@ const createGrammarHighlightPlugin = () => {
             const updatedSuggestions = recalculatePositions(tr.doc, currentSuggestions);
             currentSuggestions = updatedSuggestions;
             
-            // Force a decoration update
-            const state = tr.state;
-            const newTr = state.tr;
-            newTr.setMeta('forceUpdate', true);
-            state.view?.dispatch(newTr);
+            // Trigger a simple force update by setting a flag
+            // The component will handle the actual update
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('highlightRecalculated', {
+                detail: { type: 'grammar', suggestions: updatedSuggestions }
+              }));
+            }
           }, 2000); // 2 second debounce
           
           // Return current decorations for now
@@ -210,7 +211,6 @@ const createSmartReviewHighlightPlugin = () => {
       if (status !== 'new') return suggestion;
       
       let { from, to } = range;
-      const text = doc.textBetween(0, doc.content.size);
       
       // Get the text of the original suggestion
       const originalText = doc.textBetween(from, to);
@@ -272,11 +272,13 @@ const createSmartReviewHighlightPlugin = () => {
             const updatedSuggestions = recalculatePositions(tr.doc, currentSuggestions);
             currentSuggestions = updatedSuggestions;
             
-            // Force a decoration update
-            const state = tr.state;
-            const newTr = state.tr;
-            newTr.setMeta('forceUpdate', true);
-            state.view?.dispatch(newTr);
+            // Trigger a simple force update by setting a flag
+            // The component will handle the actual update
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('highlightRecalculated', {
+                detail: { type: 'smartReview', suggestions: updatedSuggestions }
+              }));
+            }
           }, 2000); // 2 second debounce
           
           // Return current decorations for now
@@ -723,6 +725,36 @@ export default function TipTapEditor({
     
     return () => clearTimeout(timeoutId);
   }, [editor, smartReviewSuggestions]);
+
+  // Listen for highlight recalculation events
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleHighlightRecalculated = (event: CustomEvent) => {
+      const { type, suggestions } = event.detail;
+      
+      console.log('🔄 Highlight recalculated:', { type, count: suggestions.length });
+      
+      // Force a decoration update
+      const { view } = editor;
+      if (!view) return;
+      
+      const tr = view.state.tr;
+      if (type === 'grammar') {
+        tr.setMeta('grammarSuggestions', suggestions);
+      } else if (type === 'smartReview') {
+        tr.setMeta('smartReviewSuggestions', suggestions);
+      }
+      tr.setMeta('forceUpdate', true);
+      view.dispatch(tr);
+    };
+
+    window.addEventListener('highlightRecalculated', handleHighlightRecalculated as EventListener);
+    
+    return () => {
+      window.removeEventListener('highlightRecalculated', handleHighlightRecalculated as EventListener);
+    };
+  }, [editor]);
   
   // Cleanup on unmount
   useEffect(() => {
