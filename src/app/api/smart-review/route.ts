@@ -143,6 +143,7 @@ export async function POST(request: Request) {
       hasOpenAIKey: !!OPENAI_API_KEY,
       keyLength: OPENAI_API_KEY?.length || 0,
       keyPrefix: OPENAI_API_KEY?.substring(0, 7) || 'none',
+      keySuffix: OPENAI_API_KEY?.substring(-4) || 'none',
       nodeEnv: process.env.NODE_ENV,
       vercelEnv: process.env.VERCEL_ENV,
       runtime: process.env.VERCEL_REGION || 'local'
@@ -305,12 +306,50 @@ END_OF_DOC"""`;
 
       if (!response.ok) {
         const errorText = await response.text();
-        logError('OpenAI API error:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText,
-          duration: `${openaiDuration}ms`
-        });
+        
+        // Parse error details for better diagnostics
+        let errorDetails = null;
+        try {
+          errorDetails = JSON.parse(errorText);
+        } catch (e) {
+          // Error text is not JSON, keep as string
+        }
+        
+        // Log specific error types for common issues
+        if (response.status === 401) {
+          logError('OpenAI API Authentication Error - Invalid API Key:', {
+            status: response.status,
+            keyPrefix: OPENAI_API_KEY?.substring(0, 7),
+            error: errorDetails || errorText,
+            duration: `${openaiDuration}ms`
+          });
+        } else if (response.status === 429) {
+          logError('OpenAI API Rate Limit/Quota Exceeded:', {
+            status: response.status,
+            error: errorDetails || errorText,
+            duration: `${openaiDuration}ms`,
+            ratelimitHeaders: {
+              remaining: response.headers.get('x-ratelimit-remaining-requests'),
+              reset: response.headers.get('x-ratelimit-reset-requests'),
+              limitRequests: response.headers.get('x-ratelimit-limit-requests'),
+              limitTokens: response.headers.get('x-ratelimit-limit-tokens')
+            }
+          });
+        } else if (response.status === 402) {
+          logError('OpenAI API Billing/Payment Required:', {
+            status: response.status,
+            error: errorDetails || errorText,
+            duration: `${openaiDuration}ms`
+          });
+        } else {
+          logError('OpenAI API error:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorDetails || errorText,
+            duration: `${openaiDuration}ms`
+          });
+        }
+        
         return NextResponse.json(
           { error: `OpenAI API error: ${response.status} - ${errorText}`, requestId },
           { status: response.status }
