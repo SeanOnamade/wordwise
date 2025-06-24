@@ -83,38 +83,36 @@ export async function POST(request: Request) {
       );
     }
 
-    const systemPrompt = `You are WordWise, an academic-writing coach for ESL graduate students. Return concise, actionable feedback. Never change voice; never reveal chain-of-thought.`;
+    // Shortened system and user prompts
+    const systemPrompt = `You are WordWise, an academic-writing coach for ESL graduate students. Give concise, actionable feedback.`;
 
-    const userPrompt = `### Context
-The user is an ESL graduate student writing academic English. They value clarity, formal tone, and concise sentences.
+    const userPrompt = `TASK:
+1. Find issues LanguageTool may miss (awkward phrasing, discourse markers, vague pronouns, etc.).
+2. For each, give 2-3 specific replacement suggestions.
+3. Rate on 0-100 scale (higher is better): 
+   - Clarity
+   - Academic Tone
+   - Sentence Complexity
+4. Explain each metric in one short sentence.
+5. Give up to 5 prioritized next suggestions (≤20 words each).
+6. Output valid JSON matching this schema—no extra keys, no markdown.
 
-### Task
-1. **Detect issues** the LanguageTool pass may have missed (awkward phrasing, misuse of discourse markers, vague pronouns, etc.).  
-2. **For each issue**, provide 2-3 **specific replacement suggestions** that improve the text.
-3. **Compute three metrics** on a 0-100 scale, higher is better:  
-   • *Clarity* (how easily ideas flow)  
-   • *Academic Tone* (formality, absence of contractions, use of discipline-appropriate lexicon)  
-   • *Sentence Complexity* (variety of structures; unnecessary complexity hurts the score).  
-4. **Explain** each metric in one short sentence.  
-5. Give **up to five prioritized suggestions** the user can apply next, each ≤ 20 words.  
-6. Output **valid JSON** exactly matching the schema below—no extra keys, no markdown.
-
-### JSON Schema
+SCHEMA:
 {
   "issues": [ { 
-    "excerpt": string,           // exact text that needs improvement (5-15 words)
-    "explanation": string,       // why this needs improvement
-    "replacements": [ string ]   // 2-3 specific replacement options
-  } ],   // 3-7 items
+    "excerpt": string,
+    "explanation": string,
+    "replacements": [ string ]
+  } ],
   "metrics": {
-      "clarity": { "score": integer, "comment": string },
-      "academic_tone": { "score": integer, "comment": string },
-      "sentence_complexity": { "score": integer, "comment": string }
+    "clarity": { "score": integer, "comment": string },
+    "academic_tone": { "score": integer, "comment": string },
+    "sentence_complexity": { "score": integer, "comment": string }
   },
-  "suggestions": [ string ]   // ≤5 strings
+  "suggestions": [ string ]
 }
 
-### User Document
+USER DOCUMENT:
 """START_OF_DOC
 ${content}
 END_OF_DOC"""`;

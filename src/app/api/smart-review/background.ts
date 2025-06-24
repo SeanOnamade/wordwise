@@ -3,6 +3,40 @@ import { NextResponse } from 'next/server';
 // In a real implementation, you would store jobs in a database or queue
 const jobs: Record<string, { status: 'pending' | 'done' | 'error', result?: any, error?: string }> = {};
 
+// Shortened system and user prompts for background job
+const systemPrompt = `You are WordWise, an academic-writing coach for ESL graduate students. Give concise, actionable feedback.`;
+
+const userPrompt = (content: string) => `TASK:
+1. Find issues LanguageTool may miss (awkward phrasing, discourse markers, vague pronouns, etc.).
+2. For each, give 2-3 specific replacement suggestions.
+3. Rate on 0-100 scale (higher is better): 
+   - Clarity
+   - Academic Tone
+   - Sentence Complexity
+4. Explain each metric in one short sentence.
+5. Give up to 5 prioritized next suggestions (≤20 words each).
+6. Output valid JSON matching this schema—no extra keys, no markdown.
+
+SCHEMA:
+{
+  "issues": [ { 
+    "excerpt": string,
+    "explanation": string,
+    "replacements": [ string ]
+  } ],
+  "metrics": {
+    "clarity": { "score": integer, "comment": string },
+    "academic_tone": { "score": integer, "comment": string },
+    "sentence_complexity": { "score": integer, "comment": string }
+  },
+  "suggestions": [ string ]
+}
+
+USER DOCUMENT:
+"""START_OF_DOC
+${content}
+END_OF_DOC"""`;
+
 export async function POST(request: Request) {
   const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   try {
