@@ -2,10 +2,6 @@
   "functions": {
     "src/app/api/**/*.ts": {
       "maxDuration": 10
-    },
-    "src/app/api/smart-review/route.ts": {
-      "maxDuration": 10,
-      "memory": 1024
     }
   },
   "headers": [

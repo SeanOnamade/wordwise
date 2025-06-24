@@ -1,12 +1,6 @@
 const { withSentryConfig } = require('@sentry/nextjs');
 
 /** @type {import('next').NextConfig} */
-
-// Build-time sanity check for production
-if (process.env.NODE_ENV === 'production' && !process.env.OPENAI_API_KEY) {
-  throw new Error('OPENAI_API_KEY is required for Smart Review');
-}
-
 const nextConfig = {
     webpack: (config, { isServer, dev }) => {
       if (!isServer) {
@@ -58,13 +52,6 @@ const nextConfig = {
     },
     experimental: {
       esmExternals: true,
-      instrumentationHook: true,
-    },
-    eslint: {
-      ignoreDuringBuilds: true,
-    },
-    typescript: {
-      ignoreBuildErrors: true,
     },
 };
 
