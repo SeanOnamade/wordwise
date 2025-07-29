@@ -1,5 +1,7 @@
 # WordWise - AI-Powered Writing Assistant
 
+<img width="1890" height="864" alt="Screenshot 2025-07-28 214057" src="https://github.com/user-attachments/assets/a260705b-9492-4cd9-9558-a6bf7c965b8f" />
+
 **🎯 Empowering ESL Students & Writers with Intelligent, Educational Feedback**
 
 WordWise is a sophisticated web-based writing assistant designed specifically for ESL graduate students, professionals, and content creators. Unlike traditional grammar checkers, WordWise provides educational feedback that helps users learn and improve their writing skills over time.
